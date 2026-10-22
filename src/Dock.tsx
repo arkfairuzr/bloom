@@ -1520,6 +1520,7 @@ const Dock = memo(function Dock() {
 																animate={{ opacity: 1, y: 0, scale: 1 }}
 																exit={{ opacity: 0, scale: 0.95 }}
 																transition={{ duration: 0.15 }}
+																onClick={(e) => e.stopPropagation()}
 																onMouseEnter={handlePreviewEnter}
 																onMouseLeave={handlePreviewLeave}
 															>
@@ -1528,7 +1529,12 @@ const Dock = memo(function Dock() {
 																		<div
 																			key={prev.hwnd}
 																			className="preview-item"
-																			onClick={() => invoke("focus_window", { hwnd: prev.hwnd })}
+																			onClick={(e) => {
+																		// The preview sits inside the icon: this click must not also reach the
+																		// icon's own handler, which would bring forward every window of the app.
+																		e.stopPropagation();
+																		invoke("focus_window", { hwnd: prev.hwnd });
+																	}}
 																		>
 																			<PreviewThumb
 																		image={prev.image}
@@ -1678,7 +1684,8 @@ const Dock = memo(function Dock() {
 														animate={{ opacity: 1, y: 0, scale: 1 }}
 														exit={{ opacity: 0, scale: 0.95 }}
 														transition={{ duration: 0.15 }}
-														onMouseEnter={handlePreviewEnter}
+														onClick={(e) => e.stopPropagation()}
+																onMouseEnter={handlePreviewEnter}
 																onMouseLeave={handlePreviewLeave}
 													>
 														<div className="preview-items">
@@ -1686,7 +1693,12 @@ const Dock = memo(function Dock() {
 																<div
 																	key={prev.hwnd}
 																	className="preview-item"
-																	onClick={() => invoke("focus_window", { hwnd: prev.hwnd })}
+																	onClick={(e) => {
+																		// The preview sits inside the icon: this click must not also reach the
+																		// icon's own handler, which would bring forward every window of the app.
+																		e.stopPropagation();
+																		invoke("focus_window", { hwnd: prev.hwnd });
+																	}}
 																>
 																	<PreviewThumb
 																		image={prev.image}
