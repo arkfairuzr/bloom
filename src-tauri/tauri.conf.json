@@ -115,6 +115,26 @@
         "shadow": true,
         "visible": false,
         "center": true
+      },
+      {
+        "label": "clock",
+        "title": "Bloom Clock",
+        "url": "clock.html",
+        "width": 160,
+        "height": 120,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "focus": false,
+        "focusable": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
       }
     ],
     "security": {
@@ -124,7 +144,9 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": false,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "Sehajveer Singh",
     "copyright": "Copyright © 2026 Sehajveer Singh",
     "category": "Utility",

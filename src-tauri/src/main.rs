@@ -2,6 +2,7 @@
 
 mod battery;
 mod bluetooth;
+mod clock;
 mod commands;
 mod diagnostics;
 mod dock_extras;
@@ -114,6 +115,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
             open_settings_window,
+            clock::position_clock_window,
             files::open_files_window,
             files::files_list_dir,
             files::files_places,

@@ -39,7 +39,8 @@ export default defineConfig(async () => ({
 				overlay: "overlay.html",
 				settings: "settings.html",
 				dock: "dock.html",
-				files: "files.html"
+				files: "files.html",
+				clock: "clock.html"
 			}
 		}
 	}

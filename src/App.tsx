@@ -1,6 +1,6 @@
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, memo } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
@@ -776,6 +776,18 @@ function App() {
 		if (windowLabel === "main") {
 			invoke("set_notch_visible", { visible: isVisible && !isHidden }).catch(() => {});
 		}
+	}, [isVisible, isHidden, windowLabel]);
+
+	// Tell the floating clock window whether the notch is tucked away (smart/peek
+	// mode); it shows the time while the notch is hidden. Re-sent periodically so
+	// a window that loads later still learns the current state.
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		const hidden = isVisible && isHidden;
+		const send = () => emit("notch-hidden-state", hidden).catch(() => {});
+		send();
+		const id = setInterval(send, 2000);
+		return () => clearInterval(id);
 	}, [isVisible, isHidden, windowLabel]);
 
 	useEffect(() => {

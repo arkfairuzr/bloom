@@ -12,7 +12,7 @@ import { MixerIcon, SpeakerIcon } from "./icons";
 import "./Overlay.css";
 import { EdgeSurface } from "./components/EdgeSurface";
 import { initTheme } from "./theme";
-import { createRegionSender, measureElements, type RegionRect } from "./windowRegion";
+import { createRegionSender, measureElements } from "./windowRegion";
 
 // ─── App Volume Mixer ───────────────────────────────────────────────────────
 
@@ -174,6 +174,8 @@ const MIXER_MAX_PANEL_WIDTH =
 // hit-testing uses the same 42x196.
 const HUD_CARD_WIDTH = 42;
 const HUD_CARD_HEIGHT = 196;
+/** Space between the stacked volume and brightness cards (matches .hud-left gap). */
+const HUD_GAP = 12;
 
 // Last fetched session list, so reopening the mixer renders at the right width
 // immediately instead of growing out of the empty-state width.
@@ -374,8 +376,8 @@ function VolumeNotch({
 		<motion.div
 			className="volume-notch-wrapper"
 			style={{ transformOrigin: "left center" }}
-			initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, filter: "blur(12px)", y: "-50%" }}
-			animate={{ scaleX: 1, scaleY: 1, opacity: 1, filter: "blur(0px)", y: "-50%" }}
+			initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, filter: "blur(12px)", y: 0 }}
+			animate={{ scaleX: 1, scaleY: 1, opacity: 1, filter: "blur(0px)", y: 0 }}
 			exit={
 				mixerExpanded
 					? {
@@ -384,7 +386,7 @@ function VolumeNotch({
 							x: -64,
 							opacity: 0,
 							filter: "blur(8px)",
-							y: "-50%",
+							y: 0,
 							transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] }
 						}
 					: {
@@ -392,13 +394,13 @@ function VolumeNotch({
 							scaleY: 0.8,
 							opacity: 0,
 							filter: "blur(12px)",
-							y: "-50%",
+							y: 0,
 							transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] }
 						}
 			}
 			transition={{ type: "spring", stiffness: 450, damping: 25, mass: 0.7 }}
 		>
-			<EdgeSurface edge="left" />
+			<EdgeSurface edge="left" flares={false} />
 			<motion.div
 				ref={shellRef}
 				className="volume-notch"
@@ -547,26 +549,26 @@ function BrightnessNotch({
 	return (
 		<motion.div
 			className="brightness-notch-wrapper"
-			style={{ transformOrigin: "right center" }}
-			initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, filter: "blur(12px)", y: "-50%" }}
-			animate={{ scaleX: 1, scaleY: 1, opacity: 1, filter: "blur(0px)", y: "-50%" }}
+			style={{ transformOrigin: "left center" }}
+			initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, filter: "blur(12px)", y: 0 }}
+			animate={{ scaleX: 1, scaleY: 1, opacity: 1, filter: "blur(0px)", y: 0 }}
 			exit={{
 				scaleX: 0,
 				scaleY: 0.8,
 				opacity: 0,
 				filter: "blur(12px)",
-				y: "-50%",
+				y: 0,
 				transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] }
 			}}
 			transition={{ type: "spring", stiffness: 450, damping: 25, mass: 0.7 }}
 		>
 			<div className="brightness-notch">
-				<EdgeSurface edge="right" />
+				<EdgeSurface edge="left" flares={false} />
 				<motion.div
 					className="brightness-notch-content-group"
-					initial={{ opacity: 0, x: 10 }}
+					initial={{ opacity: 0, x: -10 }}
 					animate={{ opacity: 1, x: 0 }}
-					exit={{ opacity: 0, x: 5, transition: { duration: 0.15 } }}
+					exit={{ opacity: 0, x: -5, transition: { duration: 0.15 } }}
 					transition={{ delay: 0.05, duration: 0.2, ease: "easeOut" }}
 				>
 					<div
@@ -619,9 +621,6 @@ function OverlayApp() {
 	const [brightness, setBrightness] = useState(50);
 	const [brightnessOverlayEnabled, setBrightnessOverlayEnabled] = useState(
 		() => localStorage.getItem("bloom-brightness-overlay-enabled") !== "false"
-	);
-	const [brightnessEdgeEnabled, setBrightnessEdgeEnabled] = useState(
-		() => localStorage.getItem("bloom-brightness-edge-enabled") !== "false"
 	);
 
 	// Shared state
@@ -757,17 +756,6 @@ function OverlayApp() {
 			resetHideTimeout();
 		});
 
-		const brightEdgePromise = listen<boolean>("brightness-edge-hover", (event) => {
-			if (splashActiveRef.current || !brightnessOverlayEnabled || !brightnessEdgeEnabled) return;
-			if (event.payload) {
-				setMode("brightness");
-				if (timeoutRef.current) clearTimeout(timeoutRef.current);
-			} else {
-				if (timeoutRef.current) clearTimeout(timeoutRef.current);
-				timeoutRef.current = setTimeout(() => setMode("idle"), 1500);
-			}
-		});
-
 		const autoUpdatePromise = listen<{ status: string; progress?: number }>(
 			"auto-update-status",
 			(event) => {
@@ -791,7 +779,6 @@ function OverlayApp() {
 			volPromise.then((fn) => fn());
 			volEdgePromise.then((fn) => fn());
 			brightPromise.then((fn) => fn());
-			brightEdgePromise.then((fn) => fn());
 			autoUpdatePromise.then((fn) => fn());
 			document.removeEventListener("contextmenu", preventContext);
 		};
@@ -799,7 +786,6 @@ function OverlayApp() {
 		volumeOverlayEnabled,
 		volumeEdgeEnabled,
 		brightnessOverlayEnabled,
-		brightnessEdgeEnabled,
 		resetHideTimeout
 	]);
 
@@ -807,7 +793,6 @@ function OverlayApp() {
 		"bloom-volume-overlay-enabled": setVolumeOverlayEnabled,
 		"bloom-volume-edge-enabled": setVolumeEdgeEnabled,
 		"bloom-brightness-overlay-enabled": setBrightnessOverlayEnabled,
-		"bloom-brightness-edge-enabled": setBrightnessEdgeEnabled,
 		"bloom-scale": setScale
 	});
 
@@ -919,7 +904,8 @@ function OverlayApp() {
 		[resetHideTimeout, sendBrightness]
 	);
 
-	const isLeft = mode === "volume";
+	// Volume and brightness show together, stacked at the left edge.
+	const hudActive = mode === "volume" || mode === "brightness";
 
 	const sendOverlayRegion = useMemo(
 		() =>
@@ -942,19 +928,16 @@ function OverlayApp() {
 			return;
 		}
 		const pad = 24 * scale;
-		const cardWidth = HUD_CARD_WIDTH * scale;
-		const cardHeight = HUD_CARD_HEIGHT * scale;
+		const stackHeight = (HUD_CARD_HEIGHT * 2 + HUD_GAP) * scale;
 		const leftWidth =
 			(mixerExpanded ? HUD_CARD_WIDTH + MIXER_MAX_PANEL_WIDTH : HUD_CARD_WIDTH) * scale;
-		const zone = (x: number, w: number): RegionRect => ({
-			x,
-			y: (height - cardHeight) / 2 - pad,
-			width: w,
-			height: cardHeight + pad * 2
-		});
 		sendOverlayRegion([
-			zone(0, leftWidth + pad),
-			zone(width - cardWidth - pad, cardWidth + pad),
+			{
+				x: 0,
+				y: (height - stackHeight) / 2 - pad,
+				width: leftWidth + pad,
+				height: stackHeight + pad * 2
+			},
 			...measureElements([
 				[".volume-notch-wrapper", 24],
 				[".volume-mixer-panel", 24],
@@ -1020,42 +1003,34 @@ function OverlayApp() {
 				)}
 			</AnimatePresence>
 
-			{/* Volume / Brightness Overlay */}
+			{/* Volume / Brightness Overlay: stacked at the left edge, centred as a group */}
 			{mode !== "splash" && mode !== "updating" && (
-				<div
-					style={{
-						zoom: scale,
-						height: "100%",
-						display: "flex",
-						alignItems: "center",
-						justifyContent: isLeft ? "flex-start" : "flex-end",
-						width: "100%"
-					}}
-				>
-					<AnimatePresence
-						mode="wait"
-						onExitComplete={() => {
-							if (mixerExpandedRef.current) collapseMixer();
-						}}
-					>
-						{mode === "volume" && (
-							<VolumeNotch
-								volume={volume}
-								isMuted={isMuted}
-								onVolumeChange={handleVolumeChange}
-								mixerExpanded={mixerExpanded}
-								onMixerExpandedChange={handleMixerExpandedChange}
-								key="volume-island"
-							/>
-						)}
-						{mode === "brightness" && (
-							<BrightnessNotch
-								brightness={brightness}
-								onBrightnessChange={handleBrightnessChange}
-								key="brightness-island"
-							/>
-						)}
-					</AnimatePresence>
+				<div style={{ zoom: scale, height: "100%", width: "100%" }}>
+					<div className="hud-left">
+						<AnimatePresence
+							onExitComplete={() => {
+								if (mixerExpandedRef.current) collapseMixer();
+							}}
+						>
+							{hudActive && volumeOverlayEnabled && (
+								<VolumeNotch
+									volume={volume}
+									isMuted={isMuted}
+									onVolumeChange={handleVolumeChange}
+									mixerExpanded={mixerExpanded}
+									onMixerExpandedChange={handleMixerExpandedChange}
+									key="volume-island"
+								/>
+							)}
+							{hudActive && brightnessOverlayEnabled && (
+								<BrightnessNotch
+									brightness={brightness}
+									onBrightnessChange={handleBrightnessChange}
+									key="brightness-island"
+								/>
+							)}
+						</AnimatePresence>
+					</div>
 				</div>
 			)}
 		</div>

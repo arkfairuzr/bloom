@@ -103,6 +103,7 @@ The glass file browser (tray menu → **Open Files**).
 | `bloom-volume-overlay-enabled`     | `"true"` / `"false"` | `"true"` | Show Bloom volume HUD when volume changes (replaces native Windows OSD). |
 | `bloom-volume-edge-enabled`        | `"true"` / `"false"` | `"true"` | Trigger volume HUD by hovering the left screen edge.                     |
 | `bloom-brightness-overlay-enabled` | `"true"` / `"false"` | `"true"` | Show Bloom brightness HUD when brightness changes.                       |
+| `bloom-clock-hud-enabled`          | `"true"` / `"false"` | `"true"` | Show a small floating clock at the right edge while the notch is hidden (smart/peek mode). |
 | `bloom-brightness-edge-enabled`    | `"true"` / `"false"` | `"true"` | Trigger brightness HUD by hovering the right screen edge.                |
 
 ### Appearance

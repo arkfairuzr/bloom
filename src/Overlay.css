@@ -96,11 +96,21 @@ body,
 
 /* ─── Volume Notch (Left Edge) ──────────────────────────────────────────── */
 
-.volume-notch-wrapper {
+/* Volume and brightness share this column on the left edge, vertically centred
+   as a group (volume on top, brightness below). */
+.hud-left {
 	position: fixed;
 	left: 0;
 	top: 50%;
 	transform: translateY(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 12px;
+}
+
+.volume-notch-wrapper {
+	position: relative;
 	overflow: visible;
 	transform-origin: left center;
 	--surface-bg: var(--bloom-bg, rgba(0, 0, 0, 0.8));
@@ -395,15 +405,12 @@ body,
 	opacity: 1;
 }
 
-/* ─── Brightness Notch (Right Edge) ─────────────────────────────────────── */
+/* ─── Brightness Notch (Left Edge, below volume) ────────────────────────── */
 
 .brightness-notch-wrapper {
-	position: fixed;
-	right: 0;
-	top: 50%;
-	transform: translateY(-50%);
+	position: relative;
 	overflow: visible;
-	transform-origin: right center;
+	transform-origin: left center;
 }
 
 .brightness-notch {
@@ -412,7 +419,7 @@ body,
 	align-items: center;
 	justify-content: space-between;
 	padding: 16px 0;
-	border-radius: 18px 0 0 18px;
+	border-radius: 0 18px 18px 0;
 	width: 42px;
 	height: 196px;
 	position: relative;
