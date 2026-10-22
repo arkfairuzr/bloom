@@ -45,6 +45,17 @@ Edit `settings.json` with any text editor while Bloom is running. Changes are ap
 | `bloom-notch-mode`       | `"fixed"` / `"smart"` / `"peek"` | `"fixed"` | Notch (top bar) visibility behavior. Same modes as dock. **peek** shows the notch briefly on media events and notifications.   |
 | `bloom-notch-edge-delay` | milliseconds `"0"`–`"2000"`      | `"200"`   | In smart/peek mode, how long the cursor must rest against the top screen edge before the notch peeks. `"0"` reveals instantly. |
 
+### Files
+
+The glass file browser (tray menu → **Open Files**).
+
+| Key                        | Type                 | Default   | Description                                                                                          |
+| -------------------------- | -------------------- | --------- | ---------------------------------------------------------------------------------------------------- |
+| `bloom-files-opacity`      | `"0"`–`"100"`        | `"60"`    | How dark the smoked glass is. Low values are almost clear, `"100"` is solid dark.                    |
+| `bloom-files-mono-icons`   | `"true"` / `"false"` | `"true"`  | Black-and-white file and folder icons instead of coloured ones.                                      |
+| `bloom-files-show-hidden`  | `"true"` / `"false"` | `"false"` | Show hidden and system files.                                                                        |
+| `bloom-files-favorites`    | JSON array           | `"[]"`    | Pinned folders shown in the sidebar, e.g. `[{"name":"Reports","path":"D:\\Reports"}]`.               |
+
 ### Weather
 
 | Key                              | Type                         | Default     | Description                                                                        |

@@ -190,7 +190,7 @@ fn drive_display_name(
     format!("{} ({}:)", base, letter)
 }
 
-fn list_drives() -> Vec<DockExtra> {
+pub(crate) fn list_drives() -> Vec<DockExtra> {
     let mask = unsafe { GetLogicalDrives() };
     let mut drives = Vec::new();
     for slot in 0..26u32 {
@@ -252,7 +252,7 @@ unsafe fn known_folder_path(folder: &GUID) -> Option<String> {
     result.filter(|p| !p.is_empty())
 }
 
-fn list_known_folders(enabled: &[String]) -> Vec<DockExtra> {
+pub(crate) fn list_known_folders(enabled: &[String]) -> Vec<DockExtra> {
     KNOWN_FOLDERS
         .iter()
         .filter(|(id, _, _)| enabled.iter().any(|e| e == id))
@@ -428,7 +428,7 @@ pub async fn get_dock_drives() -> Vec<DockExtra> {
     .unwrap_or_default()
 }
 
-fn shell_execute(file: &str, params: Option<&str>, verb: &str) -> Result<(), String> {
+pub(crate) fn shell_execute(file: &str, params: Option<&str>, verb: &str) -> Result<(), String> {
     use windows::Win32::UI::Shell::ShellExecuteW;
     let file_wide = to_wide(file);
     let verb_wide = to_wide(verb);

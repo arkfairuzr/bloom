@@ -93,6 +93,28 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "files",
+        "title": "Files",
+        "url": "files.html",
+        "width": 960,
+        "height": 620,
+        "minWidth": 640,
+        "minHeight": 420,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "alwaysOnTop": false,
+        "visibleOnAllWorkspaces": false,
+        "focus": true,
+        "skipTaskbar": false,
+        "shadow": true,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {

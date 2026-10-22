@@ -5,6 +5,7 @@ mod bluetooth;
 mod commands;
 mod diagnostics;
 mod dock_extras;
+mod files;
 mod services;
 mod shelf;
 mod shelf_preview;
@@ -113,6 +114,14 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
             open_settings_window,
+            files::open_files_window,
+            files::files_list_dir,
+            files::files_places,
+            files::files_open,
+            files::files_get_config,
+            files::files_set_opacity,
+            files::files_set_flag,
+            files::files_set_favorites,
             open_wifi_settings,
             open_sound_settings,
             open_notification_center,
@@ -406,6 +415,16 @@ fn main() {
                     }
                 });
             }
+            if let Some(files_win) = app.get_webview_window("files") {
+                crate::files::apply_glass(app.handle());
+                let win_clone = files_win.clone();
+                files_win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win_clone.hide();
+                    }
+                });
+            }
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -414,7 +433,9 @@ fn main() {
                     MenuItem::with_id(app, "restart", "Restart Bloom", true, None::<&str>)?;
                 let settings_item =
                     MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&settings_item, &restart_item, &quit_item])?;
+                let files_item = MenuItem::with_id(app, "files", "Open Files", true, None::<&str>)?;
+                let menu =
+                    Menu::with_items(app, &[&files_item, &settings_item, &restart_item, &quit_item])?;
                 let ah = app.handle().clone();
                 TrayIconBuilder::new()
                     .icon(app.default_window_icon().unwrap().clone())
@@ -438,6 +459,9 @@ fn main() {
                             if let Some(w) = ah.get_webview_window("settings") {
                                 let _ = w.destroy();
                             }
+                            if let Some(w) = ah.get_webview_window("files") {
+                                let _ = w.destroy();
+                            }
                             set_taskbar_visibility(true, true);
                             NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
                             set_native_osd_suppressed(false);
@@ -447,6 +471,9 @@ fn main() {
                         }
                         "settings" => {
                             crate::commands::open_settings_window(ah.clone());
+                        }
+                        "files" => {
+                            crate::files::open_files_window(ah.clone());
                         }
                         _ => {}
                     })
