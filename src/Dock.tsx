@@ -1884,6 +1884,15 @@ const Dock = memo(function Dock() {
 									>
 										Open Settings
 									</div>
+									<div
+										className="menu-item"
+										onClick={() => {
+											invoke("open_files_window");
+											closeMenu();
+										}}
+									>
+										Open Files
+									</div>
 									<div className="menu-item" onClick={() => invoke("restart_bloom")}>
 										Restart Bloom
 									</div>
@@ -1982,6 +1991,15 @@ const Dock = memo(function Dock() {
 										}}
 									>
 										Open Settings
+									</div>
+									<div
+										className="menu-item"
+										onClick={() => {
+											invoke("open_files_window");
+											closeMenu();
+										}}
+									>
+										Open Files
 									</div>
 									<div className="menu-item" onClick={() => invoke("restart_bloom")}>
 										Restart Bloom
