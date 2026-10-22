@@ -187,6 +187,8 @@ body {
 
 .preview-item .preview-placeholder {
 	display: flex;
+	flex-direction: column;
+	gap: 8px;
 	align-items: center;
 	justify-content: center;
 	width: 180px;
@@ -207,6 +209,15 @@ body {
 	background: none;
 	box-shadow: none;
 	object-fit: contain;
+}
+
+.preview-item .preview-placeholder small {
+	font-size: 10px;
+	font-weight: 400;
+	text-align: center;
+	line-height: 1.2;
+	padding: 0 8px;
+	color: rgba(255, 255, 255, 0.5);
 }
 
 .preview-label {

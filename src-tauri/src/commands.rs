@@ -3226,6 +3226,102 @@ pub async fn capture_window_thumbnail(
     .map_err(|e| e.to_string())
 }
 
+/// Result of a dock preview capture: the picture when there is one, the
+/// window's real title, and (when there is no picture) why not.
+#[derive(serde::Serialize)]
+pub struct WindowThumbnail {
+    pub image: Option<String>,
+    pub last_focused: i64,
+    pub title: String,
+    pub status: String,
+}
+
+#[tauri::command]
+pub async fn capture_window_thumbnail_ex(
+    hwnd: isize,
+    max_width: u32,
+    max_height: u32,
+) -> WindowThumbnail {
+    let fallback = |status: String| WindowThumbnail {
+        image: None,
+        last_focused: 0,
+        title: String::new(),
+        status,
+    };
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowTextW, IsIconic, IsWindow};
+
+        let hwnd = HWND(hwnd as *mut _);
+        if !IsWindow(Some(hwnd)).as_bool() {
+            return WindowThumbnail {
+                image: None,
+                last_focused: 0,
+                title: String::new(),
+                status: "window closed".into(),
+            };
+        }
+
+        let mut text = [0u16; 512];
+        let len = GetWindowTextW(hwnd, &mut text);
+        let title = if len > 0 {
+            String::from_utf16_lossy(&text[..len as usize])
+        } else {
+            String::new()
+        };
+
+        let hwnd_key = hwnd.0 as isize;
+        let mut focus_time = 0i64;
+        if let Some(map) = crate::state::FOCUS_TIMESTAMPS.get() {
+            if let Ok(guard) = map.lock() {
+                focus_time = guard.get(&hwnd_key).copied().unwrap_or(0);
+            }
+        }
+
+        if IsIconic(hwnd).as_bool() {
+            // Never restore a minimized window to capture it (it would flash on
+            // screen); use the picture saved when it was last visible, if any.
+            let cached_img = if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {
+                cache
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.get(&hwnd_key).map(|(img, _)| img.clone()))
+            } else {
+                None
+            };
+            let status = if cached_img.is_some() {
+                "saved picture"
+            } else {
+                "minimized, no saved picture"
+            };
+            return WindowThumbnail {
+                image: cached_img,
+                last_focused: focus_time,
+                title,
+                status: status.into(),
+            };
+        }
+
+        let result = crate::utils::capture_hwnd_to_base64(hwnd, max_width, max_height);
+        if let Some(ref img) = result {
+            crate::services::cache_thumbnail(hwnd_key, img.clone());
+        }
+        let status = if result.is_some() {
+            "ok"
+        } else {
+            "could not capture this window"
+        };
+        WindowThumbnail {
+            image: result,
+            last_focused: focus_time,
+            title,
+            status: status.into(),
+        }
+    })
+    .await
+    .unwrap_or_else(|e| fallback(format!("error: {e}")))
+}
+
 // ── Radio helpers — Windows Runtime Windows.Devices.Radios ───────────────────
 // Replaces PowerShell -ExecutionPolicy Bypass scripts for WiFi/Bluetooth state.
 

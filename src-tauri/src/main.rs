@@ -115,6 +115,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
             open_settings_window,
+            capture_window_thumbnail_ex,
             clock::position_clock_window,
             files::open_files_window,
             files::files_list_dir,

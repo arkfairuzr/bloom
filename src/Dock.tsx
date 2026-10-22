@@ -154,16 +154,19 @@ function WindowDots({ count, background }: { count: number; background?: boolean
 function PreviewThumb({
 	image,
 	icon,
-	label
+	label,
+	status
 }: {
 	image: string | null;
 	icon: string | null;
 	label: string;
+	status: string;
 }) {
 	if (image) return <img src={image} alt={label} />;
 	return (
 		<div className="preview-placeholder">
 			{icon ? <img src={icon} alt="" /> : <span>{label.slice(0, 1).toUpperCase()}</span>}
+			<small>{status}</small>
 		</div>
 	);
 }
@@ -213,7 +216,7 @@ const Dock = memo(function Dock() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [previewData, setPreviewData] = useState<{
 		id: string;
-		previews: { hwnd: number; title: string; image: string | null }[];
+		previews: { hwnd: number; title: string; image: string | null; status: string }[];
 	} | null>(null);
 	const [isDockHovered, setIsDockHovered] = useState(false);
 	const [isEdgeHovered, setIsEdgeHovered] = useState(false);
@@ -1197,26 +1200,32 @@ const Dock = memo(function Dock() {
 				previewTimerRef.current = setTimeout(async () => {
 					try {
 						const results = await Promise.all(
-							hwndsToCapture.map(async ([hwnd, title]) => {
-								let image: string | null = null;
-								let lastFocused = 0;
+							hwndsToCapture.map(async ([hwnd, appName]) => {
 								try {
-									const res = await invoke<[string, number] | null>("capture_window_thumbnail", {
+									const res = await invoke<{
+										image: string | null;
+										last_focused: number;
+										title: string;
+										status: string;
+									}>("capture_window_thumbnail_ex", { hwnd, maxWidth: 320, maxHeight: 200 });
+									// Every window gets a card, with the window's real title; one with no
+									// picture shows why instead of disappearing.
+									return {
 										hwnd,
-										maxWidth: 320,
-										maxHeight: 200
-									});
-									if (res) [image, lastFocused] = res;
-								} catch {}
-								// A window with no thumbnail (minimized before Bloom saw it, or one that
-								// cannot be captured) still gets a card, so every window is listed.
-								return { hwnd, title, image, lastFocused };
+										title: res.title || appName,
+										image: res.image,
+										status: res.status,
+										lastFocused: res.last_focused
+									};
+								} catch (e) {
+									return { hwnd, title: appName, image: null, status: String(e), lastFocused: 0 };
+								}
 							})
 						);
 
 						const captured = results
 							.sort((a, b) => b.lastFocused - a.lastFocused)
-							.map(({ hwnd, title, image }) => ({ hwnd, title, image }));
+							.map(({ hwnd, title, image, status }) => ({ hwnd, title, image, status }));
 
 						const currentHovered = hoveredAppRef.current;
 						if (captured.length > 0 && currentHovered === itemKey(app)) {
@@ -1521,7 +1530,12 @@ const Dock = memo(function Dock() {
 																			className="preview-item"
 																			onClick={() => invoke("focus_window", { hwnd: prev.hwnd })}
 																		>
-																			<PreviewThumb image={prev.image} icon={app.icon} label={prev.title || app.name} />
+																			<PreviewThumb
+																		image={prev.image}
+																		icon={app.icon}
+																		label={prev.title || app.name}
+																		status={prev.status}
+																	/>
 																			<div className="preview-label">{prev.title || app.name}</div>
 																			<button
 																				className="preview-close-btn"
@@ -1674,7 +1688,12 @@ const Dock = memo(function Dock() {
 																	className="preview-item"
 																	onClick={() => invoke("focus_window", { hwnd: prev.hwnd })}
 																>
-																	<PreviewThumb image={prev.image} icon={app.icon} label={prev.title || app.name} />
+																	<PreviewThumb
+																		image={prev.image}
+																		icon={app.icon}
+																		label={prev.title || app.name}
+																		status={prev.status}
+																	/>
 																	<div className="preview-label">{prev.title || app.name}</div>
 																	<button
 																		className="preview-close-btn"
