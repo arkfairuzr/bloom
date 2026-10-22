@@ -3292,7 +3292,7 @@ pub async fn capture_window_thumbnail_ex(
             let status = if cached_img.is_some() {
                 "saved picture"
             } else {
-                "minimized, no saved picture"
+                "minimized: bring it forward once to save its picture"
             };
             return WindowThumbnail {
                 image: cached_img,
@@ -3320,6 +3320,67 @@ pub async fn capture_window_thumbnail_ex(
     })
     .await
     .unwrap_or_else(|e| fallback(format!("error: {e}")))
+}
+
+/// The pictures Bloom already holds for these windows, without capturing
+/// anything, so the dock can show a preview immediately and refresh it after.
+#[tauri::command]
+pub async fn get_cached_window_thumbnails(hwnds: Vec<isize>) -> Vec<WindowThumbnail> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowTextW, IsIconic, IsWindow};
+
+        hwnds
+            .into_iter()
+            .map(|raw| unsafe {
+                let hwnd = HWND(raw as *mut _);
+                if !IsWindow(Some(hwnd)).as_bool() {
+                    return WindowThumbnail {
+                        image: None,
+                        last_focused: 0,
+                        title: String::new(),
+                        status: "window closed".into(),
+                    };
+                }
+
+                let mut text = [0u16; 512];
+                let len = GetWindowTextW(hwnd, &mut text);
+                let title = if len > 0 {
+                    String::from_utf16_lossy(&text[..len as usize])
+                } else {
+                    String::new()
+                };
+
+                let mut focus_time = 0i64;
+                if let Some(map) = crate::state::FOCUS_TIMESTAMPS.get() {
+                    if let Ok(guard) = map.lock() {
+                        focus_time = guard.get(&raw).copied().unwrap_or(0);
+                    }
+                }
+
+                let cached = crate::state::THUMBNAIL_CACHE
+                    .get()
+                    .and_then(|cache| cache.lock().ok())
+                    .and_then(|guard| guard.get(&raw).map(|(img, _)| img.clone()));
+
+                let minimized = IsIconic(hwnd).as_bool();
+                let status = match (cached.is_some(), minimized) {
+                    (true, true) => "saved picture",
+                    (false, true) => "minimized: bring it forward once to save its picture",
+                    (true, false) => "refreshing",
+                    (false, false) => "capturing",
+                };
+                WindowThumbnail {
+                    image: cached,
+                    last_focused: focus_time,
+                    title,
+                    status: status.into(),
+                }
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 // ── Radio helpers — Windows Runtime Windows.Devices.Radios ───────────────────

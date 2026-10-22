@@ -116,6 +116,7 @@ fn main() {
             hide_native_osd,
             open_settings_window,
             capture_window_thumbnail_ex,
+            get_cached_window_thumbnails,
             clock::position_clock_window,
             files::open_files_window,
             files::files_list_dir,

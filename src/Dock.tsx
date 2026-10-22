@@ -1197,48 +1197,73 @@ const Dock = memo(function Dock() {
 					.join(",")}`;
 				if (previewKeyRef.current === captureKey && previewData?.id === itemKey(app)) return;
 
+				if (hwndsToCapture.length === 0) {
+					setPreviewData(null);
+					return;
+				}
+
 				previewTimerRef.current = setTimeout(async () => {
 					try {
-						const results = await Promise.all(
-							hwndsToCapture.map(async ([hwnd, appName]) => {
-								try {
-									const res = await invoke<{
-										image: string | null;
-										last_focused: number;
-										title: string;
-										status: string;
-									}>("capture_window_thumbnail_ex", { hwnd, maxWidth: 320, maxHeight: 200 });
-									// Every window gets a card, with the window's real title; one with no
-									// picture shows why instead of disappearing.
-									return {
-										hwnd,
-										title: res.title || appName,
-										image: res.image,
-										status: res.status,
-										lastFocused: res.last_focused
-									};
-								} catch (e) {
-									return { hwnd, title: appName, image: null, status: String(e), lastFocused: 0 };
-								}
-							})
-						);
+						type Thumb = {
+							image: string | null;
+							last_focused: number;
+							title: string;
+							status: string;
+						};
+						const id = itemKey(app);
 
-						const captured = results
-							.sort((a, b) => b.lastFocused - a.lastFocused)
-							.map(({ hwnd, title, image, status }) => ({ hwnd, title, image, status }));
+						// 1. Show at once what Bloom already holds for every window.
+						const held = await invoke<Thumb[]>("get_cached_window_thumbnails", {
+							hwnds: hwndsToCapture.map(([hwnd]) => hwnd)
+						});
+						if (hoveredAppRef.current !== id) return;
+						const cards = held
+							.map((thumb, i) => ({ thumb, hwnd: hwndsToCapture[i][0], appName: hwndsToCapture[i][1] }))
+							.sort((a, b) => b.thumb.last_focused - a.thumb.last_focused);
+						previewKeyRef.current = captureKey;
+						setPreviewData({
+							id,
+							previews: cards.map(({ thumb, hwnd, appName }) => ({
+								hwnd,
+								title: thumb.title || appName,
+								image: thumb.image,
+								status: thumb.status
+							}))
+						});
 
-						const currentHovered = hoveredAppRef.current;
-						if (captured.length > 0 && currentHovered === itemKey(app)) {
-							previewKeyRef.current = captureKey;
-							setPreviewData({ id: itemKey(app), previews: captured });
-						} else if (currentHovered === itemKey(app)) {
-							setPreviewData(null);
+						// 2. Refresh each visible window as its fresh picture finishes, so the
+						// preview never waits for the slowest window. Minimized windows keep
+						// their saved picture (they are never restored to be photographed).
+						for (const { thumb, hwnd } of cards) {
+							if (thumb.status !== "refreshing" && thumb.status !== "capturing") continue;
+							invoke<Thumb>("capture_window_thumbnail_ex", { hwnd, maxWidth: 320, maxHeight: 200 })
+								.then((fresh) => {
+									if (hoveredAppRef.current !== id) return;
+									setPreviewData((prev) =>
+										prev && prev.id === id
+											? {
+													...prev,
+													previews: prev.previews.map((p) =>
+														p.hwnd === hwnd
+															? {
+																	...p,
+																	title: fresh.title || p.title,
+																	image: fresh.image ?? p.image,
+																	status: fresh.status
+																}
+															: p
+													)
+											}
+											: prev
+									);
+								})
+								.catch(() => {});
 						}
 					} catch (e) {
 						console.error("Failed to capture thumbnails:", e);
 						setPreviewData(null);
 					}
-				}, 300);
+				}, 150);
 			} else {
 				setPreviewData(null);
 			}
