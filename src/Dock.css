@@ -185,6 +185,30 @@ body {
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+.preview-item .preview-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 180px;
+	height: 110px;
+	border-radius: 6px;
+	background: rgba(0, 0, 0, 0.4);
+	color: rgba(255, 255, 255, 0.6);
+	font-size: 36px;
+	font-weight: 600;
+}
+
+.preview-item .preview-placeholder img {
+	width: 44px;
+	height: 44px;
+	max-width: 44px;
+	max-height: 44px;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	object-fit: contain;
+}
+
 .preview-label {
 	color: rgba(255, 255, 255, 0.9);
 	font-size: 12px;

@@ -150,6 +150,24 @@ function WindowDots({ count, background }: { count: number; background?: boolean
 	);
 }
 
+/** A window's thumbnail, or its app icon when no thumbnail could be captured. */
+function PreviewThumb({
+	image,
+	icon,
+	label
+}: {
+	image: string | null;
+	icon: string | null;
+	label: string;
+}) {
+	if (image) return <img src={image} alt={label} />;
+	return (
+		<div className="preview-placeholder">
+			{icon ? <img src={icon} alt="" /> : <span>{label.slice(0, 1).toUpperCase()}</span>}
+		</div>
+	);
+}
+
 const Dock = memo(function Dock() {
 	useEffect(() => {
 		return initTheme();
@@ -195,7 +213,7 @@ const Dock = memo(function Dock() {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const [previewData, setPreviewData] = useState<{
 		id: string;
-		previews: { hwnd: number; title: string; image: string }[];
+		previews: { hwnd: number; title: string; image: string | null }[];
 	} | null>(null);
 	const [isDockHovered, setIsDockHovered] = useState(false);
 	const [isEdgeHovered, setIsEdgeHovered] = useState(false);
@@ -256,6 +274,11 @@ const Dock = memo(function Dock() {
 	const previewTimerRef = useRef<any>(null);
 	const isPreviewHoveredRef = useRef(false);
 	const hoveredAppRef = useRef<string | null>(null);
+	// Hover bookkeeping for the preview: a short grace when the cursor crosses from
+	// the icon to its preview, and the last capture so a dock refresh doesn't redo it.
+	const leaveTimerRef = useRef<any>(null);
+	const prevHoveredRef = useRef<string | null>(null);
+	const previewKeyRef = useRef<string>("");
 
 	useEffect(() => {
 		if (isAnyInteraction) {
@@ -1095,9 +1118,55 @@ const Dock = memo(function Dock() {
 		return () => window.removeEventListener("blur", handleBlur);
 	}, []);
 
+	const cancelLeave = () => {
+		if (leaveTimerRef.current) {
+			clearTimeout(leaveTimerRef.current);
+			leaveTimerRef.current = null;
+		}
+	};
+
+	const handleIconEnter = (key: string) => {
+		cancelLeave();
+		setHoveredApp(key);
+	};
+
+	// Leaving the icon toward its preview must not close the preview: wait a moment
+	// and only close if the cursor did not arrive on the preview (or come back).
+	const handleIconLeave = () => {
+		if (isPreviewHoveredRef.current) return;
+		cancelLeave();
+		leaveTimerRef.current = setTimeout(() => {
+			if (isPreviewHoveredRef.current) return;
+			setHoveredApp(null);
+			setPressedApp(null);
+		}, 200);
+	};
+
+	const handlePreviewEnter = () => {
+		cancelLeave();
+		isPreviewHoveredRef.current = true;
+	};
+
+	const handlePreviewLeave = () => {
+		isPreviewHoveredRef.current = false;
+		cancelLeave();
+		leaveTimerRef.current = setTimeout(() => {
+			setHoveredApp(null);
+			setPressedApp(null);
+		}, 150);
+	};
+
+	useEffect(() => cancelLeave, []);
+
 	useEffect(() => {
 		if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
-		isPreviewHoveredRef.current = false;
+		// Only a change of hovered app resets "cursor is on the preview"; a dock
+		// refresh (new window titles, etc.) must not.
+		if (prevHoveredRef.current !== hoveredApp) {
+			isPreviewHoveredRef.current = false;
+			prevHoveredRef.current = hoveredApp;
+			previewKeyRef.current = "";
+		}
 		hoveredAppRef.current = hoveredApp;
 
 		if (!hoveredApp) {
@@ -1108,37 +1177,50 @@ const Dock = memo(function Dock() {
 		if (hoveredApp && !isDragging) {
 			const app = dockItems.find((a) => itemKey(a) === hoveredApp);
 			if (app && app.is_running && !app.is_background) {
-				const hwndsToCapture = app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : []);
+				// Every window of the app, once each.
+				const seen = new Set<number>();
+				const hwndsToCapture = (app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : [])).filter(
+					([hwnd]) => {
+						if (!hwnd || seen.has(hwnd as number)) return false;
+						seen.add(hwnd as number);
+						return true;
+					}
+				) as [number, string][];
+
+				// Same windows as the preview already on screen: nothing to redo.
+				const captureKey = `${itemKey(app)}|${hwndsToCapture
+					.map(([hwnd]) => hwnd)
+					.sort()
+					.join(",")}`;
+				if (previewKeyRef.current === captureKey && previewData?.id === itemKey(app)) return;
 
 				previewTimerRef.current = setTimeout(async () => {
 					try {
 						const results = await Promise.all(
 							hwndsToCapture.map(async ([hwnd, title]) => {
+								let image: string | null = null;
+								let lastFocused = 0;
 								try {
 									const res = await invoke<[string, number] | null>("capture_window_thumbnail", {
 										hwnd,
 										maxWidth: 320,
 										maxHeight: 200
 									});
-									if (res) {
-										const [image, lastFocused] = res;
-										return { hwnd, title, image, lastFocused };
-									}
+									if (res) [image, lastFocused] = res;
 								} catch {}
-								return null;
+								// A window with no thumbnail (minimized before Bloom saw it, or one that
+								// cannot be captured) still gets a card, so every window is listed.
+								return { hwnd, title, image, lastFocused };
 							})
 						);
 
 						const captured = results
-							.filter(
-								(r): r is { hwnd: number; title: string; image: string; lastFocused: number } =>
-									r !== null
-							)
 							.sort((a, b) => b.lastFocused - a.lastFocused)
 							.map(({ hwnd, title, image }) => ({ hwnd, title, image }));
 
 						const currentHovered = hoveredAppRef.current;
 						if (captured.length > 0 && currentHovered === itemKey(app)) {
+							previewKeyRef.current = captureKey;
 							setPreviewData({ id: itemKey(app), previews: captured });
 						} else if (currentHovered === itemKey(app)) {
 							setPreviewData(null);
@@ -1415,13 +1497,8 @@ const Dock = memo(function Dock() {
 												animate={ITEM_ANIMATE}
 												exit={ITEM_EXIT}
 												transition={ITEM_ENTRY_TRANSITION}
-												onMouseEnter={() => setHoveredApp(itemKey(app))}
-												onMouseLeave={() => {
-													if (!isPreviewHoveredRef.current) {
-														setHoveredApp(null);
-														setPressedApp(null);
-													}
-												}}
+												onMouseEnter={() => handleIconEnter(itemKey(app))}
+												onMouseLeave={handleIconLeave}
 											>
 												<AnimatePresence>
 													{dockPreviewEnabled &&
@@ -1434,23 +1511,17 @@ const Dock = memo(function Dock() {
 																animate={{ opacity: 1, y: 0, scale: 1 }}
 																exit={{ opacity: 0, scale: 0.95 }}
 																transition={{ duration: 0.15 }}
-																onMouseEnter={() => {
-																	isPreviewHoveredRef.current = true;
-																}}
-																onMouseLeave={() => {
-																	isPreviewHoveredRef.current = false;
-																	setHoveredApp(null);
-																	setPressedApp(null);
-																}}
+																onMouseEnter={handlePreviewEnter}
+																onMouseLeave={handlePreviewLeave}
 															>
 																<div className="preview-items">
-																	{previewData.previews.map((prev, idx) => (
+																	{previewData.previews.map((prev) => (
 																		<div
 																			key={prev.hwnd}
 																			className="preview-item"
 																			onClick={() => invoke("focus_window", { hwnd: prev.hwnd })}
 																		>
-																			<img src={prev.image} alt={`Preview ${idx}`} />
+																			<PreviewThumb image={prev.image} icon={app.icon} label={prev.title || app.name} />
 																			<div className="preview-label">{prev.title || app.name}</div>
 																			<button
 																				className="preview-close-btn"
@@ -1571,13 +1642,8 @@ const Dock = memo(function Dock() {
 										exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
 										className="dock-icon-wrapper"
 										onContextMenu={(e) => handleContextMenu(e, app)}
-										onMouseEnter={() => setHoveredApp(itemKey(app))}
-										onMouseLeave={() => {
-											if (!isPreviewHoveredRef.current) {
-												setHoveredApp(null);
-												setPressedApp(null);
-											}
-										}}
+										onMouseEnter={() => handleIconEnter(itemKey(app))}
+												onMouseLeave={handleIconLeave}
 										onMouseDown={(e) => {
 											if (e.button === 1) e.preventDefault();
 										}}
@@ -1598,23 +1664,17 @@ const Dock = memo(function Dock() {
 														animate={{ opacity: 1, y: 0, scale: 1 }}
 														exit={{ opacity: 0, scale: 0.95 }}
 														transition={{ duration: 0.15 }}
-														onMouseEnter={() => {
-															isPreviewHoveredRef.current = true;
-														}}
-														onMouseLeave={() => {
-															isPreviewHoveredRef.current = false;
-															setHoveredApp(null);
-															setPressedApp(null);
-														}}
+														onMouseEnter={handlePreviewEnter}
+																onMouseLeave={handlePreviewLeave}
 													>
 														<div className="preview-items">
-															{previewData.previews.map((prev, idx) => (
+															{previewData.previews.map((prev) => (
 																<div
 																	key={prev.hwnd}
 																	className="preview-item"
 																	onClick={() => invoke("focus_window", { hwnd: prev.hwnd })}
 																>
-																	<img src={prev.image} alt={`Preview ${idx}`} />
+																	<PreviewThumb image={prev.image} icon={app.icon} label={prev.title || app.name} />
 																	<div className="preview-label">{prev.title || app.name}</div>
 																	<button
 																		className="preview-close-btn"
