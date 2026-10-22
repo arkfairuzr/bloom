@@ -2715,6 +2715,15 @@ fn setup_top_edge_watchdog(app_handle: AppHandle) {
 
 /// Bottom-edge hover-intent delay in milliseconds. `0` disables the gate so the
 /// dock reveals the moment the band is touched (the pre-fix behavior).
+/// How long the dock stays up after the cursor leaves it, in milliseconds, set
+/// via `bloom-dock-hide-delay`. `0` hides as soon as the cursor is gone.
+fn dock_hide_delay_ms(app_handle: &AppHandle) -> i64 {
+    crate::utils::get_setting_str(app_handle, "bloom-dock-hide-delay")
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(150)
+        .clamp(0, 2000)
+}
+
 fn dock_edge_dwell_ms(app_handle: &AppHandle) -> i64 {
     crate::utils::get_setting_str(app_handle, "bloom-dock-edge-delay")
         .and_then(|s| s.parse::<i64>().ok())
@@ -2899,7 +2908,7 @@ fn update_dock_interaction(
 
     if edge_armed || in_dock_hover {
         is_hovered = true;
-        MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
+        MH_DOCK_EXPIRY_MS.store(now + dock_hide_delay_ms(app_handle), Ordering::Relaxed);
     }
 
     // Approaching along the bottom edge keeps the dock interactive while near

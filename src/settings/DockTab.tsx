@@ -108,6 +108,8 @@ interface DockTabProps {
 	setDockModeValue: (mode: string) => void;
 	dockEdgeDelay: number;
 	handleDockEdgeDelayChange: (val: number) => void;
+	dockHideDelay: number;
+	handleDockHideDelayChange: (val: number) => void;
 	dockPreviewEnabled: boolean;
 	toggleDockPreview: () => void;
 	dockIconOnly: boolean;
@@ -144,6 +146,8 @@ export function DockTab({
 	setDockModeValue,
 	dockEdgeDelay,
 	handleDockEdgeDelayChange,
+	dockHideDelay,
+	handleDockHideDelayChange,
 	dockPreviewEnabled,
 	toggleDockPreview,
 	dockIconOnly,
@@ -213,6 +217,7 @@ export function DockTab({
 						</SettingRow>
 
 						{dockMode !== "fixed" && (
+							<>
 							<SettingRow
 								icon={Timer}
 								label="Peek Delay"
@@ -232,6 +237,27 @@ export function DockTab({
 									className="settings-slider"
 								/>
 							</SettingRow>
+						
+								<SettingRow
+									icon={Timer}
+									label="Hide Delay"
+									desc={
+										dockHideDelay === 0
+											? "Hide as soon as the cursor leaves the dock"
+											: `Hide ${dockHideDelay}ms after the cursor leaves the dock`
+									}
+								>
+									<input
+										type="range"
+										min="0"
+										max="1500"
+										step="50"
+										value={dockHideDelay}
+										onChange={(e) => handleDockHideDelayChange(parseInt(e.target.value))}
+										className="settings-slider"
+									/>
+								</SettingRow>
+							</>
 						)}
 
 						<SettingRow icon={Eye} label="Show App Previews" desc="Show window thumbnails on hover">

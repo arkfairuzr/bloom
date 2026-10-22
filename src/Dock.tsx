@@ -179,6 +179,11 @@ const Dock = memo(function Dock() {
 	const [dockTaskView, setDockTaskView] = useState(
 		() => localStorage.getItem("bloom-dock-task-view") === "true"
 	);
+	// How long the dock lingers after the cursor leaves it (ms).
+	const [dockHideDelay, setDockHideDelay] = useState(() => {
+		const raw = Number(localStorage.getItem("bloom-dock-hide-delay"));
+		return Number.isFinite(raw) && localStorage.getItem("bloom-dock-hide-delay") !== null ? raw : 150;
+	});
 	const [startIcon, setStartIcon] = useState(
 		() => localStorage.getItem("bloom-start-icon") || "default"
 	);
@@ -257,7 +262,7 @@ const Dock = memo(function Dock() {
 			setInteractionState("active");
 		} else if (interactionState !== "none") {
 			setInteractionState("grace");
-			const timer = setTimeout(() => setInteractionState("none"), 800);
+			const timer = setTimeout(() => setInteractionState("none"), dockHideDelay);
 			return () => clearTimeout(timer);
 		}
 	}, [isAnyInteraction]);
@@ -364,6 +369,9 @@ const Dock = memo(function Dock() {
 				setDockMode(mapped);
 			}
 
+			const hideDelay = Number(getVal("bloom-dock-hide-delay", "150"));
+			if (Number.isFinite(hideDelay)) setDockHideDelay(hideDelay);
+
 			const preview = getVal("bloom-dock-preview-enabled", "true");
 			setDockPreviewEnabled(preview === "true");
 
@@ -447,6 +455,7 @@ const Dock = memo(function Dock() {
 
 	useSettingsSync({
 		"bloom-dock-mode": setDockMode,
+		"bloom-dock-hide-delay": setDockHideDelay,
 		"bloom-dock-preview-enabled": setDockPreviewEnabled,
 		"bloom-dock-icon-only": setDockIconOnly,
 		"bloom-dock-separator-enabled": setDockSeparatorEnabled,
