@@ -980,6 +980,14 @@ const Dock = memo(function Dock() {
 				return running;
 			}
 
+			// Steps 3 and 4 match on the executable alone. A browser runs the plain
+			// browser and every web app, so a pinned web app (a shortcut or app id
+			// hosted by the browser) would match any open browser window and the
+			// click would focus that instead of launching the app.
+			const pinnedIsWebApp =
+				!isBrowserHost(p.path) && !!p.executable && isBrowserHost(p.executable);
+			if (pinnedIsWebApp) return undefined;
+
 			// 3. Try fallback match by executable name if defined
 			if (p.executable) {
 				const targetExe = p.executable.toLowerCase();
