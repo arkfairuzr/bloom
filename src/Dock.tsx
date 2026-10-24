@@ -8,7 +8,13 @@ import { initTheme } from "./theme";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
 
-import { mergeTrayApps, selectDockTrayApps, type AppInfo, type TrayApp } from "./dockApps";
+import {
+	matchesPackagedExecutable,
+	mergeTrayApps,
+	selectDockTrayApps,
+	type AppInfo,
+	type TrayApp
+} from "./dockApps";
 import { driveLetter, hideDrive, removeCustomFolder, type DockExtra } from "./dockExtras";
 import { createRegionSender, measureElements, padRect, type RegionRect } from "./windowRegion";
 
@@ -65,6 +71,7 @@ function sameRunningApps(left: AppInfo[], right: AppInfo[]): boolean {
 export function isSameApp(a: AppInfo, b: AppInfo): boolean {
 	if (!a.path || !b.path) return false;
 	if (itemKey(a) === itemKey(b)) return true;
+	if (matchesPackagedExecutable(a, b)) return true;
 	// Browser hosts run many apps under one exe — only the full identity
 	// (which folds in the window/AUMID name) can match those.
 	if (isBrowserHost(a.path) || isBrowserHost(b.path)) return false;
@@ -766,6 +773,19 @@ const Dock = memo(function Dock() {
 		closeMenu();
 		setPreviewData(null);
 		try {
+			// DOCK_RECT can still include the preview's padded hit area until
+			// the next render. Publish the actual bar before placing its menu.
+			const bar = dockRef.current?.getBoundingClientRect();
+			if (bar) {
+				await invoke("update_dock_rect", {
+					rect: {
+						x: Math.round(bar.x),
+						y: Math.round(bar.y),
+						width: Math.round(bar.width),
+						height: Math.round(bar.height)
+					}
+				});
+			}
 			await invoke("show_tray_context_menu", { trayId });
 		} catch (error) {
 			showActionError(error);

@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mergeTrayApps, selectDockTrayApps, type AppInfo, type TrayApp } from "../src/dockApps";
+import {
+	matchesPackagedExecutable,
+	mergeTrayApps,
+	selectDockTrayApps,
+	type AppInfo,
+	type TrayApp
+} from "../src/dockApps";
 const tray: TrayApp = {
 	name: "Discord",
 	path: "C:\\Apps\\Discord.exe",
@@ -15,6 +21,30 @@ const windowApp: AppInfo = {
 	all_hwnds: [[11, "Discord"]]
 };
 describe("dock tray lifecycle", () => {
+	test("merges a helper-owned Steam window through its resolved executable identity", () => {
+		const steam = { ...tray, path: "C:\\Steam\\steam.exe", window_handles: [22] };
+		const helper = {
+			...windowApp,
+			path: "c:/steam/Steam.exe",
+			hwnd: 33,
+			all_hwnds: [[33, "Steam"]] as [number, string][]
+		};
+		const selected = selectDockTrayApps([helper], [steam], new Set(), () => false);
+		expect(selected.visible).toEqual([steam]);
+		expect(mergeTrayApps([helper], selected.visible)).toMatchObject([
+			{ path: helper.path, tray_ids: ["42"], is_background: false }
+		]);
+	});
+	test("does not attach a shared browser tray by executable path alone", () => {
+		const browserTray = { ...tray, path: "C:\\Browser\\brave.exe" };
+		const browserWindow = {
+			...windowApp,
+			path: browserTray.path,
+			hwnd: 99,
+			all_hwnds: [[99, "Browser"]] as [number, string][]
+		};
+		expect(mergeTrayApps([browserWindow], [browserTray])).toHaveLength(2);
+	});
 	test("does not show every tray app when the dock starts", () => {
 		const selected = selectDockTrayApps([], [tray], new Set(), () => false);
 		expect(selected.visible).toEqual([]);
@@ -78,5 +108,53 @@ describe("dock tray lifecycle", () => {
 	test("does not match a different process by display name", () => {
 		const other = { ...windowApp, hwnd: 99, all_hwnds: [[99, "Discord"]] as [number, string][] };
 		expect(mergeTrayApps([other], [tray])).toHaveLength(2);
+	});
+});
+
+describe("packaged executable identity", () => {
+	const pin = { name: "Snipping Tool", path: "Microsoft.ScreenSketch_8wekyb3d8bbwe!App" };
+	const executable = {
+		name: "Snipping Tool",
+		path: String.raw`C:\Program Files\WindowsApps\Microsoft.ScreenSketch_11.2.3.0_x64__8wekyb3d8bbwe\SnippingTool.exe`
+	};
+	test("matches a package executable to its shell identity in either direction", () => {
+		expect(matchesPackagedExecutable(pin, executable)).toBe(true);
+		expect(matchesPackagedExecutable(executable, pin)).toBe(true);
+	});
+	test("keeps distinct apps and publishers separate", () => {
+		expect(matchesPackagedExecutable(pin, { ...executable, name: "Other app" })).toBe(false);
+		expect(
+			matchesPackagedExecutable(pin, {
+				...executable,
+				path: executable.path.replace("8wekyb3d8bbwe", "otherpublisher")
+			})
+		).toBe(false);
+		expect(
+			matchesPackagedExecutable(pin, { ...pin, path: pin.path.replace("!App", "!Other") })
+		).toBe(false);
+		expect(
+			matchesPackagedExecutable(pin, {
+				...executable,
+				path: executable.path.replace("WindowsApps", "OtherFolder")
+			})
+		).toBe(false);
+		expect(matchesPackagedExecutable({ ...pin, name: "" }, { ...executable, name: "" })).toBe(
+			false
+		);
+	});
+	test("merges a packaged window and executable tray without a second dock item", () => {
+		const window = {
+			...windowApp,
+			...pin,
+			hwnd: 55,
+			all_hwnds: [[55, pin.name]] as [number, string][]
+		};
+		const icon = { ...tray, ...executable, window_handles: [] };
+		const selected = selectDockTrayApps([window], [icon], new Set(), () => false);
+		expect(selected.visible).toEqual([icon]);
+		expect(mergeTrayApps([window], [icon])).toMatchObject([
+			{ path: pin.path, tray_ids: icon.tray_ids }
+		]);
+		expect(mergeTrayApps([window], [icon])).toHaveLength(1);
 	});
 });

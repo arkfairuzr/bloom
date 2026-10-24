@@ -18,12 +18,47 @@ export interface TrayApp {
 	window_handles: number[];
 }
 
+// Match an AUMID to an executable inside its exact Windows package family.
+// Requiring the same display name avoids merging separate apps shipped in one
+// package; two different AUMIDs never match through this fallback.
+export function matchesPackagedExecutable(
+	a: Pick<AppInfo, "path" | "name">,
+	b: Pick<AppInfo, "path" | "name">
+): boolean {
+	if (!a.name.trim() || a.name.trim().toLowerCase() !== b.name.trim().toLowerCase()) return false;
+	const family = (path: string) => {
+		const match = /^([^/\\!]+_[^/\\!_]+)![^/\\!]+$/.exec(path.toLowerCase());
+		return match?.[1];
+	};
+	const executableFamily = (path: string) => {
+		const match = /(?:^|\/)windowsapps\/([^/]+)\/.+\.exe$/.exec(
+			path.toLowerCase().replace(/\\/g, "/")
+		);
+		if (!match) return undefined;
+		const parts = match[1].split("_");
+		if (parts.length !== 5 || !/^\d+\.\d+\.\d+\.\d+$/.test(parts[1]) || !parts[4]) return undefined;
+		return `${parts[0]}_${parts[4]}`;
+	};
+	const aFamily = family(a.path);
+	const bFamily = family(b.path);
+	if (!!aFamily === !!bFamily) return false;
+	return aFamily ? aFamily === executableFamily(b.path) : bFamily === executableFamily(a.path);
+}
+
 const trayPath = (app: TrayApp) => app.path.toLowerCase().replace(/\\/g, "/");
+
+const isBrowserHostPath = (p: string) => /(msedge|chrome|brave|vivaldi|firefox)\.exe$/i.test(p);
 
 const ownsVisibleWindow = (window: AppInfo, tray: TrayApp) =>
 	(window.all_hwnds ?? (window.hwnd ? [[window.hwnd, window.name]] : [])).some(([hwnd]) =>
 		tray.window_handles.includes(hwnd as number)
-	);
+	) ||
+	// A window whose UI runs in a helper process (Steam's steamwebhelper.exe)
+	// is reported under the app's own exe; its tray icon belongs to that exe.
+	// Browser hosts are excluded: one exe hosts many unrelated web apps.
+	matchesPackagedExecutable(window, tray) ||
+	(!isBrowserHostPath(window.path) &&
+		window.path.toLowerCase().replace(/\\/g, "/") === trayPath(tray));
 
 // An unpinned notification icon becomes a dock item only after its app has
 // appeared with a window. Pinned apps are eligible immediately at startup.
