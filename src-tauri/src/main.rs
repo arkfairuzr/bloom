@@ -243,15 +243,8 @@ fn main() {
                 NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
             }
 
-            // Update check on startup (non-blocking). Always runs so the UI can
-            // show an update badge; auto-install only happens when the user
-            // enabled it and the release has aged past the rollout gate.
-            {
-                let app_handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    updater::run_startup_check(app_handle).await;
-                });
-            }
+            // No startup update check: this build is a fork, and the upstream
+            // release channel would replace it with stock Bloom.
 
             let window = app.get_webview_window("main").unwrap();
             // tao rebuilds the extended style from its own flags whenever one
