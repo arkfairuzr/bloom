@@ -25,7 +25,8 @@ import {
 	HeadphonesIcon
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
-import { ArtistOrLyric } from "./lyrics";
+import { LyricsPlayer } from "./LyricsPlayer";
+import { lyricsEnabled, useLyricRows } from "./lyrics";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
@@ -2722,6 +2723,9 @@ function App() {
 
 	// Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
 	const isMusicMode = mediaInfo.has_media && bloomMode === "music" && settingsMusicModeEnabled;
+	// With time-synced lyrics for the current track the music panel changes layout.
+	const lyricRows = useLyricRows(mediaInfo, isMusicMode && lyricsEnabled());
+	const showLyricsLayout = isMusicMode && lyricRows !== null;
 	// A media session remains reachable on hover after its activity fades, or
 	// whenever the compact music display is disabled.
 	const showMusicOnStatusHover =
@@ -2746,7 +2750,10 @@ function App() {
 			const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
 			return Math.max(Math.min(200 + totalWidgets * 50, 380) - clock24hTrim, statusFitWidth);
 		}
-		if (isMusicMode && isOpen) return mediaLayout === "compact" ? 300 : 340;
+		if (isMusicMode && isOpen) {
+			if (showLyricsLayout) return 520;
+			return mediaLayout === "compact" ? 300 : 340;
+		}
 		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
 		let w = 140 - clock24hTrim;
@@ -2779,6 +2786,7 @@ function App() {
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return 300;
 		if (bloomMode === "status") return 36;
 		if (isMusicMode && isOpen) {
+			if (showLyricsLayout) return 220;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
 			let h = mediaLayout === "compact" ? (hasProgressBar ? 132 : 116) : 120;
 			if (mediaLayout === "compact") {
@@ -2972,7 +2980,18 @@ function App() {
 											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
 											transition={{ type: "spring", stiffness: 500, damping: 30 }}
 										>
-											{mediaLayout === "compact" ? (
+											{showLyricsLayout && lyricRows ? (
+												<LyricsPlayer
+													media={mediaInfo}
+													albumArtUrl={albumArtUrl}
+													albumArtKey={albumArtKey}
+													isPlaying={isPlaying}
+													rows={lyricRows}
+													onTogglePlayPause={togglePlayPause}
+													onPrev={skipPrevious}
+													onNext={skipNext}
+												/>
+											) : mediaLayout === "compact" ? (
 												<CompactMediaPlayer
 													mediaInfo={mediaInfo}
 													albumArtUrl={albumArtUrl}
@@ -3058,7 +3077,7 @@ function App() {
 														<div className="track-header-row">
 															<div className="track-info-middle">
 																<TitleMarquee title={mediaInfo.title} />
-																<ArtistOrLyric media={mediaInfo} isPlaying={isPlaying} className="premium-artist" />
+																<span className="premium-artist">{mediaInfo.artist}</span>
 															</div>
 															<div className="header-visualizer-wrap">
 																<div className="header-visualizer">

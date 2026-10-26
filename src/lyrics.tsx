@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
-interface LyricsMedia {
+export interface LyricsMedia {
 	title: string;
 	artist: string;
 	duration_ms?: number;
@@ -9,7 +8,7 @@ interface LyricsMedia {
 	position_updated_at?: number;
 }
 
-interface LyricRow {
+export interface LyricRow {
 	time: number;
 	text: string;
 }
@@ -18,7 +17,7 @@ interface LyricRow {
 // time-synced lyrics that needs no account or key.
 const LRCLIB = "https://lrclib.net/api";
 // Show a line slightly early so it is readable when the singer starts it.
-const LEAD_MS = 250;
+export const LEAD_MS = 250;
 
 const cache = new Map<string, LyricRow[] | null>();
 
@@ -84,7 +83,7 @@ async function fetchSynced(
 	}
 }
 
-function useLyrics(media: LyricsMedia, enabled: boolean): LyricRow[] | null {
+export function useLyricRows(media: LyricsMedia, enabled: boolean): LyricRow[] | null {
 	const [rows, setRows] = useState<LyricRow[] | null>(null);
 	const title = cleanTitle(media.title);
 	const artist = cleanArtist(media.artist);
@@ -113,70 +112,4 @@ function useLyrics(media: LyricsMedia, enabled: boolean): LyricRow[] | null {
 	}, [title, artist, enabled]);
 
 	return rows;
-}
-
-/**
- * The line sung right now, or null when there are no synced lyrics. It takes the
- * place of the artist line, so the music panel keeps exactly the same size.
- */
-export function useCurrentLyric(media: LyricsMedia, isPlaying: boolean): string | null {
-	const enabled = lyricsEnabled();
-	const rows = useLyrics(media, enabled);
-	const [line, setLine] = useState<string | null>(null);
-	const mediaRef = useRef(media);
-	mediaRef.current = media;
-
-	useEffect(() => {
-		if (!rows) {
-			setLine(null);
-			return;
-		}
-		const tick = () => {
-			const m = mediaRef.current;
-			const base = m.position_ms ?? 0;
-			const elapsed = isPlaying ? Date.now() - (m.position_updated_at || Date.now()) : 0;
-			const pos = base + elapsed + LEAD_MS;
-			let current: string | null = null;
-			for (const row of rows) {
-				if (row.time > pos) break;
-				current = row.text;
-			}
-			setLine(current || null);
-		};
-		tick();
-		const id = setInterval(tick, 200);
-		return () => clearInterval(id);
-	}, [rows, isPlaying]);
-
-	return line;
-}
-
-/** Artist name that gives way to the current lyric line while one is sung. */
-export function ArtistOrLyric({
-	media,
-	isPlaying,
-	className
-}: {
-	media: LyricsMedia;
-	isPlaying: boolean;
-	className: string;
-}) {
-	const lyric = useCurrentLyric(media, isPlaying);
-	const text = lyric ?? media.artist;
-	return (
-		<span className={className} style={{ position: "relative", display: "block" }}>
-			<AnimatePresence mode="wait" initial={false}>
-				<motion.span
-					key={text}
-					style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}
-					initial={{ opacity: 0, y: 3 }}
-					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: -3 }}
-					transition={{ duration: 0.15 }}
-				>
-					{text}
-				</motion.span>
-			</AnimatePresence>
-		</span>
-	);
 }

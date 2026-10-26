@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { Visualizer } from "./App";
-import { ArtistOrLyric } from "./lyrics";
 import {
 	PlayIcon,
 	PauseIcon,
@@ -227,7 +226,7 @@ export function CompactMediaPlayer({
 				</div>
 				<div className="cmp-track">
 					<TitleMarquee title={mediaInfo.title} />
-					<ArtistOrLyric media={mediaInfo} isPlaying={isPlaying} className="cmp-artist" />
+					<span className="cmp-artist">{mediaInfo.artist}</span>
 				</div>
 				<div className="cmp-visualizer">
 					<Visualizer isPlaying={isPlaying} bars={5} height={16} />
