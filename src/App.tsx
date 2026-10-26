@@ -68,6 +68,8 @@ import {
  *   Dragging files onto the notch also opens the shelf. Wheel/swipe switches
  *   between tool panels, including when a live activity occupies the pill.
  */
+// Room for the clock and panel arrows above the open music player.
+const MUSIC_HEADER_HEIGHT = 26;
 type NotchPanel = "calendar" | "command-center";
 const NOTCH_PANELS: readonly NotchPanel[] = ["calendar", "command-center"];
 const asNotchPanel = (value: unknown): NotchPanel | null =>
@@ -2025,6 +2027,16 @@ function App() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	// The music panel stays open when the pointer leaves, even in smart mode. Moving
+	// to another panel lets go, and the notch then closes at once if the pointer is away.
+	const musicPinnedRef = useRef(false);
+	useEffect(() => {
+		const want = isOpen && bloomMode === "music";
+		if (want === musicPinnedRef.current) return;
+		musicPinnedRef.current = want;
+		setNotchPinned(want);
+	}, [isOpen, bloomMode, setNotchPinned]);
+
 	// In peek mode, briefly show the notch when a new track starts or playback
 	// resumes. The notch itself never switches views for media; the collapsed
 	// pill follows the live-activity rule below.
@@ -2786,13 +2798,13 @@ function App() {
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return 300;
 		if (bloomMode === "status") return 36;
 		if (isMusicMode && isOpen) {
-			if (showLyricsLayout) return 220;
+			if (showLyricsLayout) return 220 + MUSIC_HEADER_HEIGHT;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
 			let h = mediaLayout === "compact" ? (hasProgressBar ? 132 : 116) : 120;
 			if (mediaLayout === "compact") {
 				if (compactVolumeExpanded) h += 36;
 			}
-			return h;
+			return h + MUSIC_HEADER_HEIGHT;
 		}
 		return 36;
 	};
@@ -2975,11 +2987,37 @@ function App() {
 										<motion.div
 											key="expanded-music"
 											className="expanded-music-container"
+											style={{ paddingTop: MUSIC_HEADER_HEIGHT }}
 											initial={{ opacity: 0, scale: 0.98 }}
 											animate={{ opacity: 1, scale: 1 }}
 											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
 											transition={{ type: "spring", stiffness: 500, damping: 30 }}
 										>
+											<div className="music-header">
+												<button
+													type="button"
+													className="music-header-arrow"
+													aria-label="Previous panel"
+													onClick={(e) => {
+														e.stopPropagation();
+														cyclePanel(-1);
+													}}
+												>
+													<ChevronLeft size={12} strokeWidth={2.5} />
+												</button>
+												<span className="music-header-time">{time}</span>
+												<button
+													type="button"
+													className="music-header-arrow"
+													aria-label="Next panel"
+													onClick={(e) => {
+														e.stopPropagation();
+														cyclePanel(1);
+													}}
+												>
+													<ChevronRight size={12} strokeWidth={2.5} />
+												</button>
+											</div>
 											{showLyricsLayout && lyricRows ? (
 												<LyricsPlayer
 													media={mediaInfo}
