@@ -230,6 +230,9 @@ const Dock = memo(function Dock() {
 	const [isOverlapped, setIsOverlapped] = useState(false);
 	const [isVisible, setIsVisible] = useState(true);
 	const [showAddPopup, setShowAddPopup] = useState(false);
+	// Bloom's own Start launcher; it replaces the Windows Start menu on the Start button.
+	const [showStart, setShowStart] = useState(false);
+	const startClosedAtRef = useRef(0);
 	const [nativeMenuOpen, setNativeMenuOpen] = useState(false);
 	const [contextMenu, setContextMenu] = useState<{
 		x: number;
@@ -271,15 +274,16 @@ const Dock = memo(function Dock() {
 	// behind the pill (which paints above it), so the seam stays fused even
 	// if the measurement is off by a few px at some scale.
 	useEffect(() => {
-		if (showAddPopup) {
+		if (showAddPopup || showStart) {
 			const h = dockRef.current?.getBoundingClientRect().height ?? 0;
 			if (h > 0) setPopupBottom(h / (scale || 1) - 14);
 		}
-	}, [showAddPopup, scale]);
+	}, [showAddPopup, showStart, scale]);
 
 	const isCurrentlyHovered = isDockHovered || isEdgeHovered;
 	const [interactionState, setInteractionState] = useState<"active" | "grace" | "none">("none");
-	const isAnyInteraction = isCurrentlyHovered || !!contextMenu || showAddPopup || nativeMenuOpen;
+	const isAnyInteraction =
+		isCurrentlyHovered || !!contextMenu || showAddPopup || showStart || nativeMenuOpen;
 
 	const previewTimerRef = useRef<any>(null);
 	const isPreviewHoveredRef = useRef(false);
@@ -708,7 +712,16 @@ const Dock = memo(function Dock() {
 	const handleAppClick = async (app: AppInfo) => {
 		try {
 			if (app.path === "start") {
-				await invoke("open_app", { appName: "start" });
+				if (localStorage.getItem("bloom-start-launcher") === "false") {
+					await invoke("open_app", { appName: "start" });
+				} else if (showStart) {
+					closePopup();
+				} else if (Date.now() - startClosedAtRef.current > 300) {
+					// A press outside the launcher closes it first; that press on the
+					// Start button itself must not reopen it.
+					setShowAddPopup(false);
+					setShowStart(true);
+				}
 			} else if (app.is_background && app.tray_ids?.length === 1) {
 				await invoke("activate_tray_icon", { trayId: app.tray_ids[0] });
 			} else if (app.all_hwnds && app.all_hwnds.length > 1) {
@@ -878,7 +891,9 @@ const Dock = memo(function Dock() {
 	};
 
 	const closePopup = () => {
+		if (showStart) startClosedAtRef.current = Date.now();
 		setShowAddPopup(false);
+		setShowStart(false);
 		invoke("set_menu_open", { open: false, rect: null }).catch(() => {});
 	};
 
@@ -890,6 +905,7 @@ const Dock = memo(function Dock() {
 			setContextMenu(null);
 			setActiveSubmenu(null);
 			setShowAddPopup(false);
+			setShowStart(false);
 		});
 		return () => {
 			unlisten.then((f) => f());
@@ -960,7 +976,7 @@ const Dock = memo(function Dock() {
 				height: Math.round(r.height)
 			};
 			open = true;
-		} else if (showAddPopup && popupRef.current) {
+		} else if ((showAddPopup || showStart) && popupRef.current) {
 			const r = popupRef.current.getBoundingClientRect();
 			rect = {
 				x: Math.round(r.x),
@@ -972,7 +988,7 @@ const Dock = memo(function Dock() {
 		}
 
 		invoke("set_menu_open", { open, rect }).catch(() => {});
-	}, [contextMenu, menuPos, showAddPopup, pinnedApps, activeApps, activeSubmenu, scale]);
+	}, [contextMenu, menuPos, showAddPopup, showStart, pinnedApps, activeApps, activeSubmenu, scale]);
 
 	const dockItems = useMemo(() => {
 		const runningMap = new Map();
@@ -2203,6 +2219,22 @@ const Dock = memo(function Dock() {
 			</AnimatePresence>
 
 			<AnimatePresence>
+				{showStart && (
+					<StartLauncher
+						containerRef={popupRef}
+						onClose={closePopup}
+						onLaunch={(app: AppInfo) => {
+							closePopup();
+							handleAppClick(app);
+						}}
+						scale={scale}
+						pinned={pinnedApps}
+						bottom={popupBottom}
+					/>
+				)}
+			</AnimatePresence>
+
+			<AnimatePresence>
 				{toast && (
 					<motion.div
 						className="dock-toast"
@@ -2503,6 +2535,260 @@ function AddAppPopup({
 								: "Running apps show up here — search to pin anything else"}
 						</div>
 					)}
+				</div>
+			</motion.div>
+		</div>
+	);
+}
+
+const POWER_ACTIONS: { id: string; label: string }[] = [
+	{ id: "sleep", label: "Sleep" },
+	{ id: "restart", label: "Restart" },
+	{ id: "shutdown", label: "Shut down" },
+	{ id: "signout", label: "Sign out" }
+];
+
+// Bloom's Start launcher: the pinned apps in a grid, search across everything
+// installed, and the account name with a power menu.
+function StartLauncher({
+	onClose,
+	onLaunch,
+	containerRef,
+	scale,
+	pinned,
+	bottom
+}: {
+	onClose: () => void;
+	onLaunch: (app: AppInfo) => void;
+	containerRef: React.RefObject<HTMLDivElement | null>;
+	scale: number;
+	pinned: AppInfo[];
+	bottom: number;
+}) {
+	const [installed, setInstalled] = useState<AppInfo[]>([]);
+	const [search, setSearch] = useState("");
+	const [icons, setIcons] = useState<Record<string, string>>({});
+	const [selected, setSelected] = useState(0);
+	const [userName, setUserName] = useState("");
+	const [powerOpen, setPowerOpen] = useState(false);
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		inputRef.current?.focus();
+		invoke<string>("get_user_name")
+			.then(setUserName)
+			.catch(() => {});
+	}, []);
+
+	// The full installed list is only needed once something is typed.
+	const query = search.trim().toLowerCase();
+	useEffect(() => {
+		if (!query || installed.length > 0) return;
+		invoke<AppInfo[]>("get_installed_apps")
+			.then((res) => setInstalled(res.sort((a, b) => a.name.localeCompare(b.name))))
+			.catch(() => {});
+	}, [query, installed.length]);
+
+	const items = useMemo(() => {
+		if (!query) return pinned.filter((a) => a.path !== "start");
+		const starts: AppInfo[] = [];
+		const contains: AppInfo[] = [];
+		for (const a of installed) {
+			if (a.path === "start") continue;
+			const n = a.name.toLowerCase();
+			if (n.startsWith(query)) starts.push(a);
+			else if (n.includes(query)) contains.push(a);
+		}
+		return [...starts, ...contains].slice(0, 24);
+	}, [query, pinned, installed]);
+
+	useEffect(() => {
+		setSelected(0);
+	}, [query]);
+
+	useEffect(() => {
+		let active = true;
+		const targets = items.slice(0, 24).filter((a) => !icons[a.path]);
+		if (targets.length === 0) return;
+		Promise.all(
+			targets.map(async (app) => {
+				try {
+					const icon = await invoke<string | null>("get_app_icon", {
+						path: app.path,
+						name: app.name,
+						hwnd: null
+					});
+					return [app.path, icon] as const;
+				} catch {
+					return [app.path, null] as const;
+				}
+			})
+		).then((pairs) => {
+			if (!active) return;
+			const batch: Record<string, string> = {};
+			for (const [path, icon] of pairs) if (icon) batch[path] = icon;
+			if (Object.keys(batch).length > 0) setIcons((prev) => ({ ...prev, ...batch }));
+		});
+		return () => {
+			active = false;
+		};
+	}, [items, icons]);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				if (powerOpen) setPowerOpen(false);
+				else onClose();
+			} else if (e.key === "ArrowRight") {
+				setSelected((i) => Math.min(i + 1, items.length - 1));
+			} else if (e.key === "ArrowLeft") {
+				setSelected((i) => Math.max(i - 1, 0));
+			} else if (e.key === "ArrowDown") {
+				e.preventDefault();
+				setSelected((i) => Math.min(i + 4, items.length - 1));
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				setSelected((i) => Math.max(i - 4, 0));
+			} else if (e.key === "Enter") {
+				e.preventDefault();
+				const target = items[selected];
+				if (target) onLaunch(target);
+			}
+		};
+		const handleMouseDown = (e: MouseEvent) => {
+			const popup = containerRef.current;
+			if (popup && !popup.contains(e.target as Node)) onClose();
+		};
+		const handleBlur = () => onClose();
+		window.addEventListener("keydown", handleKeyDown);
+		window.addEventListener("blur", handleBlur);
+		document.addEventListener("mousedown", handleMouseDown, true);
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown);
+			window.removeEventListener("blur", handleBlur);
+			document.removeEventListener("mousedown", handleMouseDown, true);
+		};
+	}, [onClose, onLaunch, containerRef, items, selected, powerOpen]);
+
+	return (
+		<div className="add-popup-anchor" style={{ zoom: scale, bottom }}>
+			<motion.div
+				ref={containerRef}
+				className="add-app-popup start-launcher"
+				style={{ transformOrigin: "bottom center" }}
+				initial={{ opacity: 0, scaleY: 0 }}
+				animate={{ opacity: 1, scaleY: 1 }}
+				exit={{ opacity: 0, scaleY: 0, transition: { duration: 0.16, ease: "easeIn" } }}
+				transition={{
+					opacity: { duration: 0.15 },
+					scaleY: { type: "spring", stiffness: 300, damping: 28, mass: 0.9 }
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					setPowerOpen(false);
+				}}
+			>
+				<div className="popup-search-row">
+					<svg
+						className="popup-search-icon"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<circle cx="11" cy="11" r="8" />
+						<line x1="21" y1="21" x2="16.65" y2="16.65" />
+					</svg>
+					<input
+						ref={inputRef}
+						type="text"
+						className="popup-search-input"
+						placeholder="Cari aplikasi..."
+						value={search}
+						onChange={(e) => setSearch(e.target.value)}
+					/>
+				</div>
+
+				<div className="start-grid-scroll">
+					{items.length > 0 ? (
+						<div className="start-grid">
+							{items.map((app, i) => (
+								<div
+									key={`${app.path}::${app.name}`}
+									className={`start-tile${i === selected ? " selected" : ""}`}
+									onClick={() => onLaunch(app)}
+									onMouseEnter={() => setSelected(i)}
+									title={app.name}
+								>
+									<div className="start-tile-icon">
+										{icons[app.path] ? (
+											<img src={icons[app.path]} alt="" draggable={false} />
+										) : (
+											<span>{app.name[0]}</span>
+										)}
+									</div>
+									<span className="start-tile-name">{app.name}</span>
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="popup-empty">
+							{query ? "No results" : "Pin apps to the dock to see them here"}
+						</div>
+					)}
+				</div>
+
+				<div className="start-footer">
+					<div className="start-user">
+						<div className="start-avatar">{(userName[0] || "?").toUpperCase()}</div>
+						<span>{userName}</span>
+					</div>
+					<div className="start-power-wrap">
+						{powerOpen && (
+							<div className="start-power-menu">
+								{POWER_ACTIONS.map((a) => (
+									<button
+										key={a.id}
+										type="button"
+										className="start-power-item"
+										onClick={(e) => {
+											e.stopPropagation();
+											invoke("power_action", { action: a.id }).catch(console.error);
+											onClose();
+										}}
+									>
+										{a.label}
+									</button>
+								))}
+							</div>
+						)}
+						<button
+							type="button"
+							className="start-power"
+							aria-label="Power"
+							onClick={(e) => {
+								e.stopPropagation();
+								setPowerOpen((v) => !v);
+							}}
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2.2"
+								strokeLinecap="round"
+							>
+								<path d="M12 3v9" />
+								<path d="M6.3 6.8a8 8 0 1 0 11.4 0" />
+							</svg>
+						</button>
+					</div>
 				</div>
 			</motion.div>
 		</div>

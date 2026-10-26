@@ -4147,6 +4147,39 @@ pub fn setup_settings_watcher(app: AppHandle) {
     });
 }
 
+/// The signed-in account's name, shown in Bloom's Start launcher.
+#[tauri::command]
+pub fn get_user_name() -> String {
+    std::env::var("USERNAME").unwrap_or_default()
+}
+
+/// Sleep, restart, shut down or sign out, from the Start launcher's power menu.
+#[tauri::command]
+pub async fn power_action(action: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let (program, args): (&str, Vec<&str>) = match action.as_str() {
+            "sleep" => (
+                "rundll32.exe",
+                vec!["powrprof.dll,SetSuspendState", "0,1,0"],
+            ),
+            "restart" => ("shutdown", vec!["/r", "/t", "0"]),
+            "shutdown" => ("shutdown", vec!["/s", "/t", "0"]),
+            "signout" => ("shutdown", vec!["/l"]),
+            other => return Err(format!("unknown power action: {other}")),
+        };
+        std::process::Command::new(program)
+            .args(args)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod settings_import_tests {
     use super::{read_settings_import, MAX_SETTINGS_IMPORT_BYTES};

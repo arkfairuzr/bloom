@@ -164,6 +164,8 @@ fn main() {
             show_tray_context_menu,
             activate_tray_icon,
             open_system_action,
+            get_user_name,
+            power_action,
             get_app_icon,
             get_installed_apps,
             save_pinned_apps,
