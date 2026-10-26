@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface LyricsMedia {
 	title: string;
@@ -112,4 +112,39 @@ export function useLyricRows(media: LyricsMedia, enabled: boolean): LyricRow[] |
 	}, [title, artist, enabled]);
 
 	return rows;
+}
+
+/** The line being sung right now, or null before the first line and without lyrics. */
+export function useActiveLyric(
+	rows: LyricRow[] | null,
+	media: LyricsMedia,
+	isPlaying: boolean,
+	active: boolean
+): string | null {
+	const [line, setLine] = useState<string | null>(null);
+	const mediaRef = useRef(media);
+	mediaRef.current = media;
+
+	useEffect(() => {
+		if (!rows || !active) {
+			setLine(null);
+			return;
+		}
+		const tick = () => {
+			const m = mediaRef.current;
+			const elapsed = isPlaying ? Date.now() - (m.position_updated_at || Date.now()) : 0;
+			const pos = (m.position_ms ?? 0) + elapsed + LEAD_MS;
+			let current: string | null = null;
+			for (const row of rows) {
+				if (row.time > pos) break;
+				current = row.text;
+			}
+			setLine(current || null);
+		};
+		tick();
+		const id = setInterval(tick, 200);
+		return () => clearInterval(id);
+	}, [rows, isPlaying, active]);
+
+	return line;
 }

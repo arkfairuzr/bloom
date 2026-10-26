@@ -26,7 +26,7 @@ import {
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
-import { lyricsEnabled, useLyricRows } from "./lyrics";
+import { lyricsEnabled, useActiveLyric, useLyricRows } from "./lyrics";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
@@ -2726,6 +2726,14 @@ function App() {
 	// With time-synced lyrics for the current track the music panel changes layout.
 	const lyricRows = useLyricRows(mediaInfo, isMusicMode && lyricsEnabled());
 	const showLyricsLayout = isMusicMode && lyricRows !== null;
+	// The collapsed notch shows the artwork and the line being sung, wider than usual.
+	const collapsedLyric = useActiveLyric(
+		lyricRows,
+		mediaInfo,
+		isPlaying,
+		isMusicMode && !isOpen && isPlaying
+	);
+	const showCollapsedLyric = isMusicMode && !isOpen && isPlaying && !!collapsedLyric;
 	// A media session remains reachable on hover after its activity fades, or
 	// whenever the compact music display is disabled.
 	const showMusicOnStatusHover =
@@ -2754,6 +2762,7 @@ function App() {
 			if (showLyricsLayout) return 520;
 			return mediaLayout === "compact" ? 300 : 340;
 		}
+		if (showCollapsedLyric) return 400;
 		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
 		let w = 140 - clock24hTrim;
@@ -3253,7 +3262,40 @@ function App() {
 										>
 											<div className="main-row">
 												<AnimatePresence mode="wait">
-													{(showPowerPulse || showLowBatteryPulse || showUpdatePulse) &&
+													{showCollapsedLyric ? (
+														<motion.div
+															key="collapsed-lyric"
+															className="collapsed-lyric"
+															initial={{ opacity: 0 }}
+															animate={{ opacity: 1 }}
+															exit={{ opacity: 0 }}
+															transition={{ duration: 0.15 }}
+															onClick={(e) => {
+																e.stopPropagation();
+																openNotch("music");
+															}}
+														>
+															<div className="collapsed-lyric-art">
+																{settingsAlbumArtEnabled && albumArtUrl ? (
+																	<img src={albumArtUrl} alt="" draggable={false} />
+																) : (
+																	<MusicNoteIcon className="music-placeholder-svg-small" />
+																)}
+															</div>
+															<AnimatePresence mode="wait" initial={false}>
+																<motion.span
+																	key={collapsedLyric}
+																	className="collapsed-lyric-text"
+																	initial={{ opacity: 0, y: 4 }}
+																	animate={{ opacity: 1, y: 0 }}
+																	exit={{ opacity: 0, y: -4 }}
+																	transition={{ duration: 0.15 }}
+																>
+																	{collapsedLyric}
+																</motion.span>
+															</AnimatePresence>
+														</motion.div>
+													) : (showPowerPulse || showLowBatteryPulse || showUpdatePulse) &&
 													!isHovered ? (
 														showUpdatePulse ? (
 															<motion.div
