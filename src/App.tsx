@@ -3294,6 +3294,11 @@ function App() {
 																	{collapsedLyric}
 																</motion.span>
 															</AnimatePresence>
+															{settingsVisualizerEnabled && (
+																<div className="collapsed-lyric-visualizer">
+																	<Visualizer isPlaying={isPlaying} bars={5} height={16} />
+																</div>
+															)}
 														</motion.div>
 													) : (showPowerPulse || showLowBatteryPulse || showUpdatePulse) &&
 													!isHovered ? (
