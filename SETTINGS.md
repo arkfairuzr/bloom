@@ -105,6 +105,7 @@ The glass file browser (tray menu → **Open Files**).
 | `bloom-volume-edge-enabled`        | `"true"` / `"false"` | `"true"` | Trigger volume HUD by hovering the left screen edge.                     |
 | `bloom-brightness-overlay-enabled` | `"true"` / `"false"` | `"true"` | Show Bloom brightness HUD when brightness changes.                       |
 | `bloom-clock-hud-enabled`          | `"true"` / `"false"` | `"true"` | Show a small floating clock at the right edge while the notch is hidden (smart/peek mode). |
+| `bloom-lyrics-enabled`             | `"true"` / `"false"` | `"true"` | Show the time-synced lyric line in place of the artist name in the music panel (lyrics from lrclib.net). Read from the webview's localStorage only. |
 | `bloom-brightness-edge-enabled`    | `"true"` / `"false"` | `"true"` | Trigger brightness HUD by hovering the right screen edge.                |
 
 ### Appearance

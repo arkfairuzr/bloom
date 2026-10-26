@@ -25,6 +25,7 @@ import {
 	HeadphonesIcon
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
+import { ArtistOrLyric } from "./lyrics";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
@@ -3049,7 +3050,7 @@ function App() {
 														<div className="track-header-row">
 															<div className="track-info-middle">
 																<TitleMarquee title={mediaInfo.title} />
-																<span className="premium-artist">{mediaInfo.artist}</span>
+																<ArtistOrLyric media={mediaInfo} isPlaying={isPlaying} className="premium-artist" />
 															</div>
 															<div className="header-visualizer-wrap">
 																<div className="header-visualizer">
