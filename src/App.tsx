@@ -1773,10 +1773,18 @@ function App() {
 
 	// Wheel and swipe navigate panels, even from a collapsed live activity.
 	// Music and shelf remain entry points through their activity affordances.
+	// The panels the arrows and wheel move through: the tool panels, plus the
+	// music player while a media session exists.
+	function cyclablePanels(): (NotchPanel | "music")[] {
+		const panels: (NotchPanel | "music")[] = NOTCH_PANELS.filter(panelAvailable);
+		if (settingsMusicModeEnabled && mediaInfo.has_media) panels.push("music");
+		return panels;
+	}
+
 	const cycleBloomMode = (direction: 1 | -1) => {
 		if (bloomMode === "announcement") return false;
-		const panels = NOTCH_PANELS.filter(panelAvailable);
-		const currentIndex = panels.indexOf(bloomMode as NotchPanel);
+		const panels = cyclablePanels();
+		const currentIndex = panels.indexOf(bloomMode as NotchPanel | "music");
 		const nextMode = currentIndex === -1
 			? openingPanel()
 			: panels[(currentIndex + direction + panels.length) % panels.length];
@@ -1787,8 +1795,8 @@ function App() {
 
 	// Arrows and wheel both stay within panels once one is open.
 	const cyclePanel = (direction: 1 | -1) => {
-		const panels = NOTCH_PANELS.filter(panelAvailable);
-		const index = panels.indexOf(bloomMode as NotchPanel);
+		const panels = cyclablePanels();
+		const index = panels.indexOf(bloomMode as NotchPanel | "music");
 		if (index === -1 || panels.length < 2) return;
 		setBloomMode(panels[(index + direction + panels.length) % panels.length]);
 	};
@@ -2782,10 +2790,10 @@ function App() {
 	};
 
 	const isCalendarMode = bloomMode === "calendar";
-	// Arrows switch between the two tool panels; wheel/swipe can also open one
+	// Arrows switch between the panels (calendar, controls, music); wheel/swipe can also open one
 	// directly from the collapsed pill or a live activity.
 	const showPanelArrows =
-		isOpen && asNotchPanel(bloomMode) !== null && NOTCH_PANELS.filter(panelAvailable).length > 1;
+		isOpen && cyclablePanels().includes(bloomMode as NotchPanel | "music") && cyclablePanels().length > 1;
 
 	// Close compact media player expansions when notch is unhovered or mode changes
 	useEffect(() => {
