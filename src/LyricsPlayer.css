@@ -208,8 +208,3 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-
-.collapsed-lyric-visualizer {
-	flex-shrink: 0;
-	opacity: 0.8;
-}
