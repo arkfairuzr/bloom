@@ -276,13 +276,26 @@ const Dock = memo(function Dock() {
 	// behind the pill (which paints above it), so the seam stays fused even
 	// if the measurement is off by a few px at some scale.
 	useEffect(() => {
-		if (showAddPopup || showStart) {
+		if (!showAddPopup && !showStart) return;
+		// The dock may still be growing from its hidden state when the card opens
+		// (a Windows-key press while an app is in front), so keep measuring until
+		// it has settled: the launcher follows the dock's left edge.
+		const measure = () => {
 			const r = dockRef.current?.getBoundingClientRect();
 			if (r && r.height > 0) {
 				setPopupBottom(r.height / (scale || 1) - 14);
 				setPopupLeft(r.left / (scale || 1));
 			}
-		}
+		};
+		measure();
+		const el = dockRef.current;
+		const observer = el ? new ResizeObserver(measure) : null;
+		if (el) observer?.observe(el);
+		const timers = [120, 300, 600, 1000].map((ms) => window.setTimeout(measure, ms));
+		return () => {
+			observer?.disconnect();
+			timers.forEach((t) => window.clearTimeout(t));
+		};
 	}, [showAddPopup, showStart, scale]);
 
 	const isCurrentlyHovered = isDockHovered || isEdgeHovered;
@@ -1012,7 +1025,18 @@ const Dock = memo(function Dock() {
 			}).catch(() => {});
 		}, 450);
 		return () => window.clearTimeout(timer);
-	}, [contextMenu, menuPos, showAddPopup, showStart, pinnedApps, activeApps, activeSubmenu, scale]);
+	}, [
+		contextMenu,
+		menuPos,
+		showAddPopup,
+		showStart,
+		popupLeft,
+		popupBottom,
+		pinnedApps,
+		activeApps,
+		activeSubmenu,
+		scale
+	]);
 
 	const dockItems = useMemo(() => {
 		const runningMap = new Map();
