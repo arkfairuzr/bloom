@@ -2635,10 +2635,27 @@ function StartLauncher({
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
-		inputRef.current?.focus();
 		invoke<string>("get_user_name")
 			.then(setUserName)
 			.catch(() => {});
+		// The dock never takes focus on its own; ask for it so typing lands here.
+		invoke("set_launcher_focus", { active: true })
+			.catch(() => {})
+			.finally(() => inputRef.current?.focus());
+		return () => {
+			invoke("set_launcher_focus", { active: false }).catch(() => {});
+		};
+	}, []);
+
+	// Closing on blur only makes sense once the window actually had focus.
+	const hadFocusRef = useRef(false);
+	useEffect(() => {
+		const onFocus = () => {
+			hadFocusRef.current = true;
+			inputRef.current?.focus();
+		};
+		window.addEventListener("focus", onFocus);
+		return () => window.removeEventListener("focus", onFocus);
 	}, []);
 
 	// The full installed list is only needed once something is typed.
@@ -2720,7 +2737,9 @@ function StartLauncher({
 			const popup = containerRef.current;
 			if (popup && !popup.contains(e.target as Node)) onClose();
 		};
-		const handleBlur = () => onClose();
+		const handleBlur = () => {
+			if (hadFocusRef.current) onClose();
+		};
 		window.addEventListener("keydown", handleKeyDown);
 		window.addEventListener("blur", handleBlur);
 		document.addEventListener("mousedown", handleMouseDown, true);

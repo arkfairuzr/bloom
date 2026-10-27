@@ -4147,6 +4147,22 @@ pub fn setup_settings_watcher(app: AppHandle) {
     });
 }
 
+/// Lets the dock window take keyboard focus while the Start launcher is open, so
+/// typing in its search box reaches it. The dock is normally never activated, so
+/// that clicking it does not take focus from the app in front.
+#[tauri::command]
+pub fn set_launcher_focus(app: AppHandle, active: bool) {
+    let Some(win) = app.get_webview_window("dock") else {
+        return;
+    };
+    if active {
+        let _ = win.set_focusable(true);
+        let _ = win.set_focus();
+    } else {
+        let _ = win.set_focusable(false);
+    }
+}
+
 /// The signed-in account's name, shown in Bloom's Start launcher.
 #[tauri::command]
 pub fn get_user_name() -> String {

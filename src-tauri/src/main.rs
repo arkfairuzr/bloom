@@ -165,6 +165,7 @@ fn main() {
             activate_tray_icon,
             open_system_action,
             get_user_name,
+            set_launcher_focus,
             power_action,
             get_app_icon,
             get_installed_apps,
