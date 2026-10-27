@@ -233,6 +233,8 @@ const Dock = memo(function Dock() {
 	// Bloom's own Start launcher; it replaces the Windows Start menu on the Start button.
 	const [showStart, setShowStart] = useState(false);
 	const startClosedAtRef = useRef(0);
+	const startLauncherEnabledRef = useRef(localStorage.getItem("bloom-start-launcher") !== "false");
+	const [popupLeft, setPopupLeft] = useState(0);
 	const [nativeMenuOpen, setNativeMenuOpen] = useState(false);
 	const [contextMenu, setContextMenu] = useState<{
 		x: number;
@@ -275,8 +277,11 @@ const Dock = memo(function Dock() {
 	// if the measurement is off by a few px at some scale.
 	useEffect(() => {
 		if (showAddPopup || showStart) {
-			const h = dockRef.current?.getBoundingClientRect().height ?? 0;
-			if (h > 0) setPopupBottom(h / (scale || 1) - 14);
+			const r = dockRef.current?.getBoundingClientRect();
+			if (r && r.height > 0) {
+				setPopupBottom(r.height / (scale || 1) - 14);
+				setPopupLeft(r.left / (scale || 1));
+			}
 		}
 	}, [showAddPopup, showStart, scale]);
 
@@ -421,6 +426,7 @@ const Dock = memo(function Dock() {
 			const adaptive = getVal("bloom-dock-adaptive", "false");
 			setDockAdaptive(adaptive === "true");
 			setDockTaskView(getVal("bloom-dock-task-view", "false") === "true");
+			startLauncherEnabledRef.current = getVal("bloom-start-launcher", "true") !== "false";
 
 			const startIconVal = getVal("bloom-start-icon", "default") || "default";
 			setStartIcon(startIconVal);
@@ -712,7 +718,7 @@ const Dock = memo(function Dock() {
 	const handleAppClick = async (app: AppInfo) => {
 		try {
 			if (app.path === "start") {
-				if (localStorage.getItem("bloom-start-launcher") === "false") {
+				if (!startLauncherEnabledRef.current) {
 					await invoke("open_app", { appName: "start" });
 				} else if (showStart) {
 					closePopup();
@@ -988,6 +994,24 @@ const Dock = memo(function Dock() {
 		}
 
 		invoke("set_menu_open", { open, rect }).catch(() => {});
+
+		// The card opens with a scale animation, so its box is still collapsed when
+		// first measured; measure again once it has settled or clicks fall through.
+		if (!(showAddPopup || showStart) || contextMenu) return;
+		const timer = window.setTimeout(() => {
+			if (!popupRef.current) return;
+			const r = popupRef.current.getBoundingClientRect();
+			invoke("set_menu_open", {
+				open: true,
+				rect: {
+					x: Math.round(r.x),
+					y: Math.round(r.y),
+					width: Math.round(r.width),
+					height: Math.round(r.height)
+				}
+			}).catch(() => {});
+		}, 450);
+		return () => window.clearTimeout(timer);
 	}, [contextMenu, menuPos, showAddPopup, showStart, pinnedApps, activeApps, activeSubmenu, scale]);
 
 	const dockItems = useMemo(() => {
@@ -1123,12 +1147,22 @@ const Dock = memo(function Dock() {
 	useEffect(() => {
 		// The backend claims Win+1-9 while the native taskbar is hidden and reports
 		// which pinned slot was pressed; behaviour matches a click on that icon.
+		const unlistenStart = listen("dock-toggle-start", () => {
+			handleAppClickRef.current({
+				name: "Start",
+				path: "start",
+				icon: null,
+				is_running: false,
+				is_pinned: true
+			} as AppInfo);
+		});
 		const unlisten = listen<number>("dock-win-number", (event) => {
 			const app = pinnedItemsRef.current[event.payload];
 			if (app) handleAppClickRef.current(app);
 		});
 		return () => {
 			unlisten.then((f) => f());
+			unlistenStart.then((f) => f());
 		};
 	}, []);
 
@@ -2230,6 +2264,7 @@ const Dock = memo(function Dock() {
 						scale={scale}
 						pinned={pinnedApps}
 						bottom={popupBottom}
+						left={popupLeft}
 					/>
 				)}
 			</AnimatePresence>
@@ -2556,7 +2591,8 @@ function StartLauncher({
 	containerRef,
 	scale,
 	pinned,
-	bottom
+	bottom,
+	left
 }: {
 	onClose: () => void;
 	onLaunch: (app: AppInfo) => void;
@@ -2564,6 +2600,7 @@ function StartLauncher({
 	scale: number;
 	pinned: AppInfo[];
 	bottom: number;
+	left: number;
 }) {
 	const [installed, setInstalled] = useState<AppInfo[]>([]);
 	const [search, setSearch] = useState("");
@@ -2671,11 +2708,20 @@ function StartLauncher({
 	}, [onClose, onLaunch, containerRef, items, selected, powerOpen]);
 
 	return (
-		<div className="add-popup-anchor" style={{ zoom: scale, bottom }}>
+		<div
+			className="add-popup-anchor"
+			style={{
+				zoom: scale,
+				bottom,
+				justifyContent: "flex-start",
+				paddingLeft: left,
+				boxSizing: "border-box"
+			}}
+		>
 			<motion.div
 				ref={containerRef}
 				className="add-app-popup start-launcher"
-				style={{ transformOrigin: "bottom center" }}
+				style={{ transformOrigin: "bottom left" }}
 				initial={{ opacity: 0, scaleY: 0 }}
 				animate={{ opacity: 1, scaleY: 1 }}
 				exit={{ opacity: 0, scaleY: 0, transition: { duration: 0.16, ease: "easeIn" } }}

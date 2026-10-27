@@ -24,6 +24,9 @@ static KEYBOARD_HOOK_APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 /// Physical Win key state, tracked so Win+1-9 can be claimed while the Win key
 /// itself keeps flowing to the shell (a lone Win tap must still open Start).
 static WIN_KEY_DOWN: AtomicBool = AtomicBool::new(false);
+/// Another key was pressed while Win was held, so releasing Win ends a shortcut
+/// (Win+E) and not a bare tap that opens Start.
+static WIN_COMBO_USED: AtomicBool = AtomicBool::new(false);
 /// Digit (1-9) of the currently held Win+Number combo, 0 when none. Key
 /// auto-repeat re-fires the keydown; only the first press may toggle an app.
 static WIN_NUMBER_HELD: AtomicU8 = AtomicU8::new(0);
@@ -45,7 +48,8 @@ pub fn setup_keyboard_hook(app_handle: AppHandle) {
     std::thread::spawn(move || {
         // Exiting removes the hook with the process; never touch it mid-shutdown.
         while !SHUTTING_DOWN.load(Ordering::Relaxed) {
-            let wanted = NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed) && dock_win_number_enabled();
+            let wanted = NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed)
+                && (dock_win_number_enabled() || start_launcher_enabled());
             if wanted != (KEYBOARD_HOOK.load(Ordering::Relaxed) != 0) {
                 // A low-level hook runs on the thread that installed it, which
                 // needs a message loop, so install and remove it on the main thread.
@@ -87,6 +91,17 @@ fn dock_win_number_enabled() -> bool {
         return true;
     };
     crate::utils::get_setting_str(app, "bloom-dock-win-number-enabled")
+        .map(|v| v != "false")
+        .unwrap_or(true)
+}
+
+/// A bare Win tap opens Bloom's Start launcher instead of the Windows Start
+/// menu; `bloom-start-launcher` set to `"false"` leaves Win to Windows.
+fn start_launcher_enabled() -> bool {
+    let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get() else {
+        return true;
+    };
+    crate::utils::get_setting_str(app, "bloom-start-launcher")
         .map(|v| v != "false")
         .unwrap_or(true)
 }
@@ -151,6 +166,16 @@ fn send_start_menu_mask() {
     }
 }
 
+/// Asks the dock window to open or close its Start launcher.
+fn emit_dock_start_toggle() {
+    let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get().cloned() else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        let _ = app.emit_to("dock", "dock-toggle-start", ());
+    });
+}
+
 /// Hands the slot to the dock window, whose click handler already knows how to
 /// focus a running window or launch a pinned app.
 fn emit_dock_win_number(index: u8) {
@@ -183,15 +208,33 @@ unsafe extern "system" fn keyboard_hook_proc(
         if (kb.flags.0 & LLKHF_INJECTED.0) == 0 {
             if vk_code == VK_LWIN || vk_code == VK_RWIN {
                 if is_down {
+                    // Auto-repeat keeps re-firing the keydown; only the first one
+                    // starts a new press.
+                    if !WIN_KEY_DOWN.load(Ordering::Relaxed) {
+                        WIN_COMBO_USED.store(false, Ordering::Relaxed);
+                    }
                     WIN_KEY_DOWN.store(true, Ordering::Relaxed);
                     // A fresh Win press always starts a fresh combo, even if the
                     // previous digit's keyup was missed.
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
                 } else if is_up {
+                    let bare_tap = WIN_KEY_DOWN.load(Ordering::Relaxed)
+                        && !WIN_COMBO_USED.load(Ordering::Relaxed);
                     WIN_KEY_DOWN.store(false, Ordering::Relaxed);
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
+                    if bare_tap
+                        && NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed)
+                        && start_launcher_enabled()
+                    {
+                        // Keeps Explorer from treating this release as a Start tap.
+                        send_start_menu_mask();
+                        emit_dock_start_toggle();
+                    }
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
+                if is_down {
+                    WIN_COMBO_USED.store(true, Ordering::Relaxed);
+                }
                 if let Some(index) = win_number_index(vk_code.0) {
                     let slot = index + 1;
                     if is_up {

@@ -823,6 +823,8 @@ body {
 .start-launcher {
 	width: 380px;
 	height: 420px;
+	/* The dock window is transparent, so a backdrop blur has nothing to blur. */
+	background: rgba(20, 20, 24, 0.9);
 }
 
 .start-grid-scroll {
