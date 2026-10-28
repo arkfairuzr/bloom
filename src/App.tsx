@@ -26,6 +26,7 @@ import {
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
+import { useFallbackArt } from "./fallbackArt";
 import { lyricsEnabled, useLyricRows } from "./lyrics";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
@@ -600,7 +601,14 @@ function App() {
 		is_playing: false,
 		has_media: false
 	});
-	const [albumArtUrl, setAlbumArtUrl] = useState<string | null>(null);
+	const [nativeAlbumArtUrl, setAlbumArtUrl] = useState<string | null>(null);
+	// Players that give Windows no artwork get a cover looked up by title and artist.
+	const fallbackArtUrl = useFallbackArt(
+		mediaInfo.title,
+		mediaInfo.artist,
+		mediaInfo.has_media && !nativeAlbumArtUrl
+	);
+	const albumArtUrl = nativeAlbumArtUrl ?? fallbackArtUrl;
 	const [albumArtKey, setAlbumArtKey] = useState(0);
 	const [volume, setVolume] = useState(0.5);
 	const [isMuted, setIsMuted] = useState(false);
@@ -2809,7 +2817,7 @@ function App() {
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return 300;
 		if (bloomMode === "status") return 36;
 		if (isMusicMode && isOpen) {
-			if (showLyricsLayout) return 220 + MUSIC_HEADER_HEIGHT;
+			if (showLyricsLayout) return 250 + MUSIC_HEADER_HEIGHT;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
 			let h = mediaLayout === "compact" ? (hasProgressBar ? 132 : 116) : 120;
 			if (mediaLayout === "compact") {

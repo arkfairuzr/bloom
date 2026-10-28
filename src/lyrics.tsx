@@ -30,11 +30,11 @@ export function lyricsEnabled(): boolean {
 }
 
 // "Artist - Topic" is how YouTube Music names auto-generated artist channels.
-function cleanArtist(artist: string): string {
+export function cleanArtist(artist: string): string {
 	return artist.replace(/\s*-\s*Topic$/i, "").trim();
 }
 
-function cleanTitle(title: string): string {
+export function cleanTitle(title: string): string {
 	return title
 		.replace(/\s*[(\[](official|lyrics?|audio|video|music video|visualizer|hd|4k)[^)\]]*[)\]]/gi, "")
 		.trim();

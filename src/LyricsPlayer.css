@@ -92,14 +92,19 @@
 	font-size: 14px;
 	line-height: 1.3;
 	font-weight: 500;
-	white-space: nowrap;
+	/* Lines above and below are one line; the current one wraps in full. */
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
 	overflow: hidden;
-	text-overflow: ellipsis;
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 
 .lyp-line.current {
 	font-size: 17px;
 	font-weight: 700;
+	-webkit-line-clamp: 3;
 }
 
 .lyp-controls {
