@@ -181,8 +181,8 @@
 }
 
 .qp-row.active .qp-row-icon {
-	background: var(--bloom-text, white);
-	color: var(--bloom-bg-expanded, black);
+	background: #c9edfa;
+	color: #002f8e;
 }
 
 .qp-row-text {
@@ -249,14 +249,14 @@
 }
 
 .qp-btn.primary {
-	background: var(--bloom-text, white);
-	border-color: var(--bloom-text, white);
-	color: var(--bloom-bg-expanded, black);
+	background: #c9edfa;
+	border-color: #c9edfa;
+	color: #002f8e;
 }
 
 .qp-btn.primary:hover:not(:disabled) {
 	opacity: 0.9;
-	background: var(--bloom-text, white);
+	background: #c9edfa;
 }
 
 .qp-btn:disabled {

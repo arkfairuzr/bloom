@@ -1869,6 +1869,33 @@ img {
 	color: var(--bloom-bg-expanded, black);
 }
 
+/* Active tiles: white with navy text. Wi-Fi and Bluetooth tiles that also have a
+   connection turn light blue. */
+.cc-pill-tile.active {
+	background: #ffffff;
+	border-color: #ffffff;
+}
+
+.cc-pill-tile.active .cc-pill-title,
+.cc-pill-tile.active .cc-pill-status,
+.cc-pill-tile.active .cc-pill-more {
+	color: #002f8e;
+}
+
+.cc-pill-tile.active .cc-pill-icon-wrapper {
+	background: rgba(0, 47, 142, 0.1);
+	color: #002f8e;
+}
+
+.cc-pill-tile.active.connected {
+	background: #c9edfa;
+	border-color: #c9edfa;
+}
+
+.cc-pill-tile.active.connected .cc-pill-icon-wrapper {
+	background: rgba(0, 47, 142, 0.12);
+}
+
 /* Circular Actions Row */
 .cc-circular-actions-row {
 	display: flex;

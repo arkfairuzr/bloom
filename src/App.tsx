@@ -3597,7 +3597,7 @@ function App() {
 											<div className="cc-pills-grid">
 												{/* Wi-Fi Pill */}
 												<div
-													className={`cc-pill-tile ${wifiEnabled ? "active" : ""}`}
+													className={`cc-pill-tile ${wifiEnabled ? "active" : ""} ${wifiEnabled && wifiConnected ? "connected" : ""}`}
 													onClick={(e) => {
 														e.stopPropagation();
 														toggleWifi();
@@ -3656,7 +3656,7 @@ function App() {
 
 												{/* Bluetooth Pill */}
 												<div
-													className={`cc-pill-tile ${bluetoothEnabled ? "active" : ""}`}
+													className={`cc-pill-tile ${bluetoothEnabled ? "active" : ""} ${bluetoothEnabled && btConnectedNames.length > 0 ? "connected" : ""}`}
 													onClick={(e) => {
 														e.stopPropagation();
 														toggleBluetooth();
