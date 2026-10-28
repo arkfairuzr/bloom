@@ -2451,3 +2451,11 @@ img {
 	user-select: none;
 	-webkit-user-select: none;
 }
+
+/* Date beside the time in the closed notch */
+.time-date {
+	margin-right: 8px;
+	font-weight: 500;
+	opacity: 0.6;
+	white-space: nowrap;
+}

@@ -70,6 +70,8 @@ import {
  */
 // Room for the clock and panel arrows above the open music player.
 const MUSIC_HEADER_HEIGHT = 26;
+// Extra width of the closed notch for the date beside the time.
+const DATE_PILL_WIDTH = 82;
 type NotchPanel = "calendar" | "command-center";
 const NOTCH_PANELS: readonly NotchPanel[] = ["calendar", "command-center"];
 const asNotchPanel = (value: unknown): NotchPanel | null =>
@@ -504,6 +506,7 @@ function App() {
 	}, []);
 
 	const [time, setTime] = useState("");
+	const [dateLabel, setDateLabel] = useState("");
 	const [isHovered, setIsHovered] = useState(false);
 	// Expanded into a panel by a click. Hover alone only peeks.
 	const [isOpen, setIsOpen] = useState(false);
@@ -2089,6 +2092,9 @@ function App() {
 					hour12: !timeFormat24h
 				})
 			);
+			setDateLabel(
+				now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })
+			);
 		};
 
 		updateTime();
@@ -2748,6 +2754,10 @@ function App() {
 	// The 24-hour clock is ~16px narrower than the 12-hour one.
 	const clock24hTrim = timeFormat24h ? 16 : 0;
 
+	// The closed notch shows the date beside the time while the clock is on show.
+	const showDateInPill =
+		bloomMode === "status" && !isOpen && !(timerSeconds > 0 || isTimerFinished);
+
 	// Calculate width dynamically based on enabled features
 	const getDynamicWidth = () => {
 		if (bloomMode === "announcement" && announcement && !announcementDismissed) return 380;
@@ -2769,6 +2779,7 @@ function App() {
 		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
 		let w = 140 - clock24hTrim;
+		if (showDateInPill) w += DATE_PILL_WIDTH;
 		if (isMusicMode) {
 			if (settingsVisualizerEnabled && isPlaying) w += 30;
 			if (settingsAlbumArtEnabled) w += 30;
@@ -3422,6 +3433,9 @@ function App() {
 																				exit={{ rotateX: 90, opacity: 0 }}
 																				transition={{ type: "spring", stiffness: 600, damping: 30 }}
 																			>
+																				{showDateInPill && dateLabel && (
+																					<span className="time-date">{dateLabel}</span>
+																				)}
 																				{time}
 																			</motion.span>
 																		)}
