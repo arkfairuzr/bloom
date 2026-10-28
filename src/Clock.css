@@ -64,3 +64,28 @@ body,
 	letter-spacing: 0.4px;
 	opacity: 0.55;
 }
+
+.clock-date {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	margin-top: 7px;
+	padding-top: 7px;
+	width: 26px;
+	border-top: 1px solid var(--bloom-border, rgba(255, 255, 255, 0.15));
+}
+
+.clock-weekday,
+.clock-month {
+	font-size: 9px;
+	font-weight: 600;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+	opacity: 0.55;
+}
+
+.clock-day {
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 1.15;
+}

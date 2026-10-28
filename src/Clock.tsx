@@ -92,6 +92,15 @@ function ClockApp() {
 		};
 	}, [now, use24h]);
 
+	const date = useMemo(
+		() => ({
+			weekday: now.toLocaleDateString(undefined, { weekday: "short" }),
+			day: String(now.getDate()),
+			month: now.toLocaleDateString(undefined, { month: "short" })
+		}),
+		[now]
+	);
+
 	return (
 		<div className="clock-root">
 			<div className={`clock-card ${shown ? "shown" : ""}`}>
@@ -99,6 +108,11 @@ function ClockApp() {
 				<span className="clock-hour">{time.hour}</span>
 				<span className="clock-minute">{time.minute}</span>
 				{time.suffix && <span className="clock-suffix">{time.suffix}</span>}
+				<div className="clock-date">
+					<span className="clock-weekday">{date.weekday}</span>
+					<span className="clock-day">{date.day}</span>
+					<span className="clock-month">{date.month}</span>
+				</div>
 			</div>
 		</div>
 	);

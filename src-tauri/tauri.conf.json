@@ -121,7 +121,7 @@
         "title": "Bloom Clock",
         "url": "clock.html",
         "width": 160,
-        "height": 120,
+        "height": 180,
         "decorations": false,
         "transparent": true,
         "resizable": false,
