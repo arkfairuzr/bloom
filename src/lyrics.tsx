@@ -53,34 +53,66 @@ export function parseLrc(lrc: string): LyricRow[] {
 	return rows.sort((a, b) => a.time - b.time);
 }
 
+interface LrclibHit {
+	duration?: number;
+	syncedLyrics?: string | null;
+}
+
+// The best hit that has synced lyrics: one whose length is within a few seconds of
+// the track's when it is known, otherwise the first.
+function pickSynced(hits: LrclibHit[], durationMs: number): LyricRow[] | null {
+	const synced = hits.filter((h) => h.syncedLyrics);
+	if (synced.length === 0) return null;
+	const close =
+		durationMs > 0
+			? synced.find((h) => h.duration && Math.abs(h.duration * 1000 - durationMs) <= 4000)
+			: undefined;
+	const rows = parseLrc((close ?? synced[0]).syncedLyrics as string);
+	return rows.length > 0 ? rows : null;
+}
+
+/**
+ * Looks the track up on LRCLIB, from the exact match to ever looser searches.
+ * `settled` is false when a request failed, so the miss is not remembered.
+ */
 async function fetchSynced(
 	title: string,
 	artist: string,
 	durationMs: number,
 	signal: AbortSignal
-): Promise<LyricRow[] | null> {
-	const params = new URLSearchParams({ track_name: title, artist_name: artist });
-	if (durationMs > 0) params.set("duration", String(Math.round(durationMs / 1000)));
-	try {
-		const res = await fetch(`${LRCLIB}/get?${params}`, { signal });
-		if (res.ok) {
-			const body = await res.json();
-			if (typeof body.syncedLyrics === "string" && body.syncedLyrics) {
-				return parseLrc(body.syncedLyrics);
-			}
+): Promise<{ rows: LyricRow[] | null; settled: boolean }> {
+	let settled = true;
+	const getJson = async (url: string): Promise<unknown> => {
+		try {
+			const res = await fetch(url, { signal });
+			if (res.ok) return await res.json();
+			if (res.status !== 404) settled = false;
+		} catch {
+			settled = false;
 		}
-		// No exact match: take the first search hit that has synced lyrics.
-		const search = await fetch(
-			`${LRCLIB}/search?${new URLSearchParams({ track_name: title, artist_name: artist })}`,
-			{ signal }
-		);
-		if (!search.ok) return null;
-		const hits: { syncedLyrics?: string | null }[] = await search.json();
-		const hit = hits.find((h) => h.syncedLyrics);
-		return hit?.syncedLyrics ? parseLrc(hit.syncedLyrics) : null;
-	} catch {
 		return null;
+	};
+
+	const exact = new URLSearchParams({ track_name: title, artist_name: artist });
+	if (durationMs > 0) exact.set("duration", String(Math.round(durationMs / 1000)));
+	const hit = (await getJson(`${LRCLIB}/get?${exact}`)) as LrclibHit | null;
+	if (hit?.syncedLyrics) {
+		const rows = parseLrc(hit.syncedLyrics);
+		if (rows.length > 0) return { rows, settled };
 	}
+
+	const searches = [
+		new URLSearchParams({ track_name: title, artist_name: artist }),
+		new URLSearchParams({ q: `${artist} ${title}`.trim() }),
+		new URLSearchParams({ q: title })
+	];
+	for (const query of searches) {
+		if (signal.aborted) break;
+		const hits = (await getJson(`${LRCLIB}/search?${query}`)) as LrclibHit[] | null;
+		const rows = Array.isArray(hits) ? pickSynced(hits, durationMs) : null;
+		if (rows) return { rows, settled };
+	}
+	return { rows: null, settled };
 }
 
 export function useLyricRows(media: LyricsMedia, enabled: boolean): LyricRow[] | null {
@@ -101,10 +133,11 @@ export function useLyricRows(media: LyricsMedia, enabled: boolean): LyricRow[] |
 		}
 		setRows(null);
 		const controller = new AbortController();
-		fetchSynced(title, artist, duration, controller.signal).then((found) => {
+		fetchSynced(title, artist, duration, controller.signal).then(({ rows: found, settled }) => {
 			if (controller.signal.aborted) return;
-			cache.set(key, found && found.length > 0 ? found : null);
-			setRows(found && found.length > 0 ? found : null);
+			// A failed request is not remembered, so the next visit tries again.
+			if (settled || found) cache.set(key, found);
+			setRows(found);
 		});
 		return () => controller.abort();
 		// The duration only sharpens the match; a late value must not refetch.
