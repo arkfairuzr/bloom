@@ -27,6 +27,7 @@ import {
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
 import { useFallbackArt } from "./fallbackArt";
+import { useArtIsLight } from "./artBrightness";
 import { lyricsEnabled, useLyricRows } from "./lyrics";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
@@ -2749,6 +2750,8 @@ function App() {
 
 	// Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
 	const isMusicMode = mediaInfo.has_media && bloomMode === "music" && settingsMusicModeEnabled;
+	// A bright cover makes a bright glow behind the player, so its text turns dark.
+	const artIsLight = useArtIsLight(isMusicMode && settingsAmbienceEnabled ? albumArtUrl : null);
 	// With time-synced lyrics for the current track the music panel changes layout.
 	const lyricRows = useLyricRows(mediaInfo, isMusicMode && lyricsEnabled());
 	const showLyricsLayout = isMusicMode && lyricRows !== null;
@@ -2961,7 +2964,7 @@ function App() {
 					<AnimatePresence>
 						{isMusicMode && settingsAmbienceEnabled && albumArtUrl && isOpen && !isCalendarMode && (
 							<motion.div
-								className="notch-ambient-glow"
+								className={`notch-ambient-glow${artIsLight ? " light" : ""}`}
 								initial={{ opacity: 0 }}
 								animate={{ opacity: 1 }}
 								exit={{ opacity: 0 }}
@@ -3005,7 +3008,7 @@ function App() {
 									{isOpen && isMusicMode && !isCalendarMode ? (
 										<motion.div
 											key="expanded-music"
-											className="expanded-music-container"
+											className={`expanded-music-container${artIsLight ? " light-art" : ""}`}
 											style={{ paddingTop: MUSIC_HEADER_HEIGHT }}
 											initial={{ opacity: 0, scale: 0.98 }}
 											animate={{ opacity: 1, scale: 1 }}

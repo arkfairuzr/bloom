@@ -172,3 +172,19 @@
 	opacity: 0;
 	cursor: pointer;
 }
+
+.light-art .lyp-divider {
+	background: rgba(18, 18, 24, 0.25);
+}
+
+.light-art .lyp-bar {
+	background: rgba(18, 18, 24, 0.2);
+}
+
+.light-art .lyp-bar-fill {
+	background: rgba(18, 18, 24, 0.85);
+}
+
+.light-art .lyp-art {
+	background: rgba(18, 18, 24, 0.08);
+}

@@ -2459,3 +2459,24 @@ img {
 	opacity: 0.6;
 	white-space: nowrap;
 }
+
+/* Dark text over a bright album-art glow. The players read these two variables. */
+.expanded-music-container.light-art {
+	--bloom-text: rgba(18, 18, 24, 0.92);
+	--bloom-text-muted: rgba(18, 18, 24, 0.6);
+	color: var(--bloom-text);
+}
+
+.expanded-music-container.light-art .cmp-track-bar {
+	background: rgba(18, 18, 24, 0.2);
+}
+
+/* A bright glow keeps its colour out to the edges, so dark text stays readable there. */
+.notch-ambient-glow.light::after {
+	background: radial-gradient(
+		ellipse at center,
+		transparent 40%,
+		rgba(0, 0, 0, 0.1) 75%,
+		rgba(0, 0, 0, 0.3) 100%
+	);
+}
