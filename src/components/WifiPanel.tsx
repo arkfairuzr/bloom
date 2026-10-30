@@ -57,6 +57,9 @@ interface WifiPanelProps {
 	onPinChange: (pinned: boolean) => void;
 }
 
+// Pending release of the keyboard focus taken for the password field.
+let blurTimer: number | undefined;
+
 export function WifiPanel({ enabled, onToggle, onBack, onPinChange }: WifiPanelProps) {
 	const [list, setList] = useState<WifiNetworkList | null>(null);
 	const [scanning, setScanning] = useState(false);
@@ -205,8 +208,26 @@ export function WifiPanel({ enabled, onToggle, onBack, onPinChange }: WifiPanelP
 						value={password}
 						disabled={isBusy}
 						onChange={(e) => setPassword(e.target.value)}
-						onFocus={() => onPinChange(true)}
-						onBlur={() => onPinChange(false)}
+						onFocus={(e) => {
+							window.clearTimeout(blurTimer);
+							onPinChange(true);
+							// The notch is never activated by itself, so ask for keyboard
+							// focus or what is typed goes to the app in front.
+							const input = e.currentTarget;
+							invoke("set_input_focus", { label: "main", active: true })
+								.catch(() => {})
+								.finally(() => input.focus());
+						}}
+						onBlur={(e) => {
+							// Activating the window can blur and refocus the field in quick
+							// succession; only let go if the focus really left it.
+							const input = e.currentTarget;
+							blurTimer = window.setTimeout(() => {
+								if (document.activeElement === input) return;
+								onPinChange(false);
+								invoke("set_input_focus", { label: "main", active: false }).catch(() => {});
+							}, 200);
+						}}
 						onKeyDown={(e) => {
 							e.stopPropagation();
 							if (e.key === "Enter" && password) void connect(n, true);

@@ -4147,12 +4147,13 @@ pub fn setup_settings_watcher(app: AppHandle) {
     });
 }
 
-/// Lets the dock window take keyboard focus while the Start launcher is open, so
-/// typing in its search box reaches it. The dock is normally never activated, so
-/// that clicking it does not take focus from the app in front.
+/// Lets one of Bloom's windows take keyboard focus while something in it needs
+/// typing (the Start launcher's search, the Wi-Fi password). These windows are
+/// normally never activated, so that clicking them does not take focus from the
+/// app in front, and keystrokes would otherwise go to that app.
 #[tauri::command]
-pub fn set_launcher_focus(app: AppHandle, active: bool) {
-    let Some(win) = app.get_webview_window("dock") else {
+pub fn set_input_focus(app: AppHandle, label: String, active: bool) {
+    let Some(win) = app.get_webview_window(&label) else {
         return;
     };
     if active {

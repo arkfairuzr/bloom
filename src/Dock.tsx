@@ -2639,11 +2639,11 @@ function StartLauncher({
 			.then(setUserName)
 			.catch(() => {});
 		// The dock never takes focus on its own; ask for it so typing lands here.
-		invoke("set_launcher_focus", { active: true })
+		invoke("set_input_focus", { label: "dock", active: true })
 			.catch(() => {})
 			.finally(() => inputRef.current?.focus());
 		return () => {
-			invoke("set_launcher_focus", { active: false }).catch(() => {});
+			invoke("set_input_focus", { label: "dock", active: false }).catch(() => {});
 		};
 	}, []);
 
