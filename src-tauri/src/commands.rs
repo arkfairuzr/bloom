@@ -1506,6 +1506,10 @@ unsafe fn pwa_icon_for_window(hwnd: HWND, process_path: &str) -> Option<String> 
                         return Some(icon);
                     }
                 }
+                // The app is known but its icon is not on disk. The browser process
+                // is shared with other apps, so its command line may name another
+                // one (a different app's icon); use the window's own icon instead.
+                return None;
             }
             if let Some(command_line) = process_command_line(pid) {
                 if let Some(icon) = pwa_icon_from_command_line(process_path, &command_line) {
@@ -1519,7 +1523,18 @@ unsafe fn pwa_icon_for_window(hwnd: HWND, process_path: &str) -> Option<String> 
         // command line may advertise an `--app-id` that does not belong to this
         // window. Do not consult it; let the caller fall back to the window icon.
         Some(_) => return None,
-        None => {}
+        None => {
+            // Chrome, Edge and Brave always stamp their windows; a missing id is a
+            // failed lookup, and the shared process command line could name the
+            // wrong web app.
+            let host = process_path.to_lowercase();
+            if host.contains("chrome.exe")
+                || host.contains("msedge.exe")
+                || host.contains("brave.exe")
+            {
+                return None;
+            }
+        }
     }
     // Fall back to the process command line for hosts that don't stamp the window.
     let mut pid = 0u32;
