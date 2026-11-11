@@ -27,6 +27,20 @@ export function isBrowserHost(path: string) {
 	return HOST_PROCESSES.some((host) => p.includes(host));
 }
 
+// The browsers themselves, as opposed to the web apps they host.
+const PLAIN_BROWSER_NAMES = [
+	"google chrome",
+	"chrome",
+	"microsoft edge",
+	"edge",
+	"brave",
+	"brave browser",
+	"vivaldi",
+	"firefox",
+	"mozilla firefox"
+];
+const isPlainBrowserName = (name: string) => PLAIN_BROWSER_NAMES.includes(name.trim().toLowerCase());
+
 // Stable identity for a dock item.
 export function appIdentity(p: string, executable?: string, name?: string) {
 	if (!p) return "";
@@ -742,14 +756,20 @@ const Dock = memo(function Dock() {
 					setShowStart(true);
 				}
 			} else if (app.is_background && app.tray_ids?.length === 1) {
-				await invoke("activate_tray_icon", { trayId: app.tray_ids[0] });
+				try {
+					await invoke("activate_tray_icon", { trayId: app.tray_ids[0] });
+				} catch {
+					// The tray icon cannot always be reached (hidden in the overflow area);
+					// launching the app again brings its window back.
+					await invoke("open_app", { appName: app.path, displayName: app.name });
+				}
 			} else if (app.all_hwnds && app.all_hwnds.length > 1) {
 				// Several windows: bring the most recent forward, then cycle.
 				await invoke("focus_app_windows", { hwnds: app.all_hwnds.map(([hwnd]) => hwnd) });
 			} else if (app.hwnd) {
 				await invoke("focus_window", { hwnd: app.hwnd });
 			} else {
-				await invoke("open_app", { appName: app.path });
+				await invoke("open_app", { appName: app.path, displayName: app.name });
 			}
 		} catch (e) {
 			console.error(`Failed to interact with ${app.name}:`, e);
@@ -1068,8 +1088,9 @@ const Dock = memo(function Dock() {
 			// browser and every web app, so a pinned web app (a shortcut or app id
 			// hosted by the browser) would match any open browser window and the
 			// click would focus that instead of launching the app.
-			const pinnedIsWebApp =
-				!isBrowserHost(p.path) && !!p.executable && isBrowserHost(p.executable);
+			const pinnedIsWebApp = isBrowserHost(p.path)
+				? !isPlainBrowserName(p.name)
+				: !!p.executable && isBrowserHost(p.executable);
 			if (pinnedIsWebApp) return undefined;
 
 			// 3. Try fallback match by executable name if defined

@@ -660,7 +660,7 @@ fn toggle_start_menu() {
 }
 
 #[tauri::command]
-pub async fn open_app(app: AppHandle, app_name: String) {
+pub async fn open_app(app: AppHandle, app_name: String, display_name: Option<String>) {
     if app_name == "start" {
         toggle_start_menu();
         return;
@@ -671,7 +671,14 @@ pub async fn open_app(app: AppHandle, app_name: String) {
         return;
     }
 
-    tauri::async_runtime::spawn_blocking(move || launch_path(&app_name));
+    tauri::async_runtime::spawn_blocking(move || {
+        // A web app pinned under its browser's executable would open the plain
+        // browser; its Start menu shortcut carries the arguments that open the app.
+        let target = pwa_launch_target(&app_name, display_name.as_deref())
+            .filter(|target| !target.eq_ignore_ascii_case(&app_name))
+            .unwrap_or(app_name);
+        launch_path(&target)
+    });
 }
 
 fn is_bloom_launch_target(target: &str, identifier: &str) -> bool {
@@ -707,10 +714,52 @@ fn pwa_launch_target(path: &str, name: Option<&str>) -> Option<String> {
         .file_name()?
         .to_str()?
         .to_lowercase();
-    let apps = INSTALLED_APPS_CACHE.get()?.lock().ok()?;
-    apps.iter()
-        .find(|app| is_pwa_shortcut_for(app, name, &host_exe))
-        .map(|app| app.path.clone())
+    let cached = INSTALLED_APPS_CACHE
+        .get()
+        .and_then(|cache| cache.lock().ok())
+        .and_then(|apps| {
+            apps.iter()
+                .find(|app| {
+                    is_pwa_shortcut_for(app, name, &host_exe)
+                        && app.path.to_lowercase().ends_with(".lnk")
+                })
+                .map(|app| app.path.clone())
+        });
+    // The installed list can hold the entry under the browser's executable instead
+    // of its shortcut, so look for the shortcut in the Start menu itself.
+    cached.or_else(|| start_menu_shortcut_named(name))
+}
+
+/// The Start menu shortcut whose file name is `name`, searched a few folders deep.
+fn start_menu_shortcut_named(name: &str) -> Option<String> {
+    fn walk(dir: &std::path::Path, name: &str, depth: u32) -> Option<String> {
+        if depth > 3 {
+            return None;
+        }
+        let mut subdirs = Vec::new();
+        for entry in std::fs::read_dir(dir).ok()?.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                subdirs.push(path);
+            } else if path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("lnk"))
+                && path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|stem| stem.eq_ignore_ascii_case(name))
+            {
+                return Some(path.to_string_lossy().to_string());
+            }
+        }
+        subdirs.iter().find_map(|sub| walk(sub, name, depth + 1))
+    }
+
+    ["PROGRAMDATA", "APPDATA"].iter().find_map(|var| {
+        let base = std::env::var(var).ok()?;
+        let root = std::path::PathBuf::from(base).join(r"Microsoft\Windows\Start Menu\Programs");
+        walk(&root, name, 0)
+    })
 }
 
 fn is_pwa_shortcut_for(app: &AppInfo, name: &str, host_exe: &str) -> bool {
