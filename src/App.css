@@ -2608,3 +2608,39 @@ img {
 	background: rgba(255, 255, 255, 0.35);
 	border-radius: 2px;
 }
+
+/* Music panel header: clock over the cover on the left, the song search in the middle */
+.music-header-row {
+	position: absolute;
+	top: 3px;
+	left: 0;
+	right: 0;
+	height: 22px;
+	display: flex;
+	align-items: center;
+	z-index: 11;
+}
+
+.music-header-row .music-header {
+	position: static;
+	transform: none;
+	flex: 0 0 168px;
+	width: 168px;
+	justify-content: center;
+}
+
+/* Beside the clock; the narrow layouts leave room for the queue button on the right. */
+.music-search-slot {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	justify-content: center;
+	padding-right: 36px;
+	box-sizing: border-box;
+}
+
+/* In the lyrics layout the search is centred on the panel: the clock's width is mirrored. */
+.music-header-row.wide .music-search-slot {
+	padding-right: 0;
+	margin-right: 168px;
+}

@@ -15,6 +15,8 @@ const KEY_SCOPES = "bloom-spotify-scopes";
 
 export interface QueueTrack {
 	id: string;
+	/** `spotify:track:<id>`, what playing and queueing need. */
+	uri: string;
 	title: string;
 	artist: string;
 	image: string | null;
@@ -177,6 +179,7 @@ async function accessToken(): Promise<string> {
 
 interface ApiTrack {
 	id?: string;
+	uri?: string;
 	name?: string;
 	type?: string;
 	artists?: { name: string }[];
@@ -192,6 +195,7 @@ function toTrack(item: ApiTrack | null): QueueTrack | null {
 	const image = images.length > 0 ? images[Math.min(1, images.length - 1)].url : null;
 	return {
 		id: item.id ?? item.name,
+		uri: item.uri ?? "",
 		title: item.name,
 		artist: item.artists?.map((a) => a.name).join(", ") ?? item.show?.name ?? "",
 		image,
@@ -251,4 +255,43 @@ export function useSpotifyQueue(active: boolean, connectedKey: number) {
 	}, [active, connectedKey, refresh]);
 
 	return { queue, error, refresh };
+}
+
+async function authorized(url: string, init: RequestInit = {}): Promise<Response> {
+	const token = await accessToken();
+	return fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } });
+}
+
+async function failure(res: Response): Promise<Error> {
+	const body = await res.json().catch(() => ({}));
+	return new Error(body?.error?.message ?? `Spotify answered ${res.status}`);
+}
+
+/** Songs matching a search, best first. */
+export async function searchTracks(query: string): Promise<QueueTrack[]> {
+	const res = await authorized(
+		`https://api.spotify.com/v1/search?${new URLSearchParams({ q: query, type: "track", limit: "8" })}`
+	);
+	if (!res.ok) throw await failure(res);
+	const body: { tracks?: { items?: ApiTrack[] } } = await res.json();
+	return (body.tracks?.items ?? []).map(toTrack).filter((t): t is QueueTrack => t !== null);
+}
+
+/** Plays a song now. Changing playback needs Spotify Premium. */
+export async function playTrack(uri: string): Promise<void> {
+	const res = await authorized("https://api.spotify.com/v1/me/player/play", {
+		method: "PUT",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ uris: [uri] })
+	});
+	if (!res.ok) throw await failure(res);
+}
+
+/** Adds a song to the end of the queue. */
+export async function addToQueue(uri: string): Promise<void> {
+	const res = await authorized(
+		`https://api.spotify.com/v1/me/player/queue?${new URLSearchParams({ uri })}`,
+		{ method: "POST" }
+	);
+	if (!res.ok) throw await failure(res);
 }

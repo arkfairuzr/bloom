@@ -28,6 +28,7 @@ import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
 import { FileePanel } from "./FileePanel";
 import { QueuePanel } from "./QueuePanel";
+import { SpotifySearch } from "./SpotifySearch";
 import { useFallbackArt } from "./fallbackArt";
 import { useArtIsLight } from "./artBrightness";
 import { lyricsEnabled, useLyricRows } from "./lyrics";
@@ -3156,32 +3157,37 @@ function App() {
 											transition={{ type: "spring", stiffness: 500, damping: 30 }}
 										>
 											<div
-												className="music-header"
-												style={queueOpen ? { left: `calc(50% - ${QUEUE_WIDTH / 2}px)` } : undefined}
+												className={`music-header-row${showLyricsLayout && lyricRows ? " wide" : ""}`}
+												style={queueOpen ? { right: QUEUE_WIDTH } : undefined}
 											>
+												<div className="music-header">
 												<button
-													type="button"
-													className="music-header-arrow"
-													aria-label="Previous panel"
-													onClick={(e) => {
-														e.stopPropagation();
-														cyclePanel(-1);
-													}}
-												>
-													<ChevronLeft size={12} strokeWidth={2.5} />
-												</button>
-												<span className="music-header-time">{time}</span>
-												<button
-													type="button"
-													className="music-header-arrow"
-													aria-label="Next panel"
-													onClick={(e) => {
-														e.stopPropagation();
-														cyclePanel(1);
-													}}
-												>
-													<ChevronRight size={12} strokeWidth={2.5} />
-												</button>
+														type="button"
+														className="music-header-arrow"
+														aria-label="Previous panel"
+														onClick={(e) => {
+															e.stopPropagation();
+															cyclePanel(-1);
+														}}
+													>
+														<ChevronLeft size={12} strokeWidth={2.5} />
+													</button>
+													<span className="music-header-time">{time}</span>
+													<button
+														type="button"
+														className="music-header-arrow"
+														aria-label="Next panel"
+														onClick={(e) => {
+															e.stopPropagation();
+															cyclePanel(1);
+														}}
+													>
+														<ChevronRight size={12} strokeWidth={2.5} />
+													</button>
+												</div>
+												<div className="music-search-slot">
+													<SpotifySearch onNeedConnect={() => setQueueOpen(true)} />
+												</div>
 											</div>
 											{!(showLyricsLayout && lyricRows) && (
 												<button
