@@ -7,6 +7,7 @@ mod commands;
 mod diagnostics;
 mod dock_extras;
 mod files;
+mod filee;
 mod services;
 mod shelf;
 mod shelf_preview;
@@ -166,6 +167,8 @@ fn main() {
             open_system_action,
             get_user_name,
             set_input_focus,
+            filee::filee_targets,
+            filee::filee_convert,
             power_action,
             get_app_icon,
             get_installed_apps,

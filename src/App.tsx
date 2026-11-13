@@ -46,6 +46,7 @@ import {
 	Cpu,
 	MemoryStick,
 	HardDrive,
+	ArrowRightLeft,
 	ArrowUpDown,
 	BellRing,
 	Play,
@@ -72,6 +73,31 @@ import {
  */
 // Room for the clock and panel arrows above the open music player.
 const MUSIC_HEADER_HEIGHT = 26;
+
+// Formats shown first when converting a shelf file; the rest follow in Filee's order.
+const CONVERT_PRIORITY = [
+	"png",
+	"jpg",
+	"webp",
+	"pdf",
+	"docx",
+	"xlsx",
+	"pptx",
+	"txt",
+	"mp4",
+	"mp3",
+	"gif",
+	"wav",
+	"flac",
+	"zip"
+];
+function prioritizeConvertTargets(targets: string[]): string[] {
+	const rank = (t: string) => {
+		const i = CONVERT_PRIORITY.indexOf(t.toLowerCase());
+		return i === -1 ? CONVERT_PRIORITY.length : i;
+	};
+	return [...targets].sort((a, b) => rank(a) - rank(b));
+}
 // Extra width of the closed notch for the date beside the time.
 const DATE_PILL_WIDTH = 82;
 type NotchPanel = "calendar" | "command-center";
@@ -1392,7 +1418,7 @@ function App() {
 		if (item.type !== "file" || !item.path) return;
 		// The remove button must keep receiving its own click; capturing the
 		// pointer on the tile would retarget it.
-		if ((e.target as HTMLElement).closest(".shelf-tile-remove")) return;
+		if ((e.target as HTMLElement).closest(".shelf-tile-remove, .shelf-tile-convert")) return;
 		e.stopPropagation();
 		e.currentTarget.setPointerCapture(e.pointerId);
 		shelfPointerRef.current = { id: item.id, x: e.clientX, y: e.clientY, dragging: false };
@@ -1578,6 +1604,11 @@ function App() {
 		}, 900);
 	};
 	const [shelfNotice, setShelfNotice] = useState<string | null>(null);
+	// Converting a shelf file with Filee: the file whose formats are showing, the
+	// formats it can become, and the one being made.
+	const [convertItemId, setConvertItemId] = useState<string | null>(null);
+	const [convertTargets, setConvertTargets] = useState<string[] | null>(null);
+	const [convertBusy, setConvertBusy] = useState<string | null>(null);
 	const shelfNoticeTimer = useRef<number | null>(null);
 	const showShelfNotice = (message: string) => {
 		setShelfNotice(message);
@@ -1617,6 +1648,48 @@ function App() {
 		const added = fresh.slice(0, room);
 		markShelfNew(added.map((i) => i.id));
 		setShelfItems([...added, ...prev]);
+	};
+
+	const closeShelfConvert = () => {
+		setConvertItemId(null);
+		setConvertTargets(null);
+	};
+
+	const openShelfConvert = async (item: ShelfItem) => {
+		if (!item.path || convertBusy) return;
+		if (convertItemId === item.id) {
+			closeShelfConvert();
+			return;
+		}
+		setConvertItemId(item.id);
+		setConvertTargets(null);
+		try {
+			const targets = await invoke<string[]>("filee_targets", { path: item.path });
+			if (targets.length === 0) {
+				showShelfNotice("Filee can't convert this kind of file");
+				closeShelfConvert();
+				return;
+			}
+			setConvertTargets(prioritizeConvertTargets(targets));
+		} catch (e) {
+			showShelfNotice(String(e));
+			closeShelfConvert();
+		}
+	};
+
+	const convertShelfItem = async (item: ShelfItem, to: string) => {
+		if (!item.path || convertBusy) return;
+		setConvertBusy(to);
+		try {
+			const outputs = await invoke<string[]>("filee_convert", { path: item.path, to });
+			addShelfItems(outputs);
+			showShelfNotice(`Saved ${outputs[0].split("\\").pop()}`);
+		} catch (e) {
+			showShelfNotice(`Couldn't convert: ${String(e).slice(0, 90)}`);
+		} finally {
+			setConvertBusy(null);
+			closeShelfConvert();
+		}
 	};
 
 	const addShelfText = (text: string) => {
@@ -2814,7 +2887,7 @@ function App() {
 		// plus room for the scrollbar once the tiles overflow it.
 		if (bloomMode === "shelf") {
 			if (shelfItems.length === 0) return 130;
-			return shelfOverflowing ? 190 : 176;
+			return (shelfOverflowing ? 190 : 176) + (convertItemId ? 34 : 0);
 		}
 		if (bloomMode === "command-center") return isOpen ? 230 : 36;
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return 300;
@@ -4029,6 +4102,35 @@ function App() {
 											transition={{ type: "spring", stiffness: 400, damping: 30 }}
 										>
 											{shelfNotice && <div className="shelf-notice">{shelfNotice}</div>}
+											{(() => {
+												const convertItem = shelfItems.find((i) => i.id === convertItemId);
+												if (!convertItem) return null;
+												return (
+													<div className="shelf-convert">
+														<span className="shelf-convert-label">Convert to</span>
+														{convertTargets === null ? (
+															<span className="shelf-convert-wait">…</span>
+														) : (
+															<div className="shelf-convert-chips">
+																{convertTargets.map((target) => (
+																	<button
+																		key={target}
+																		type="button"
+																		className="shelf-convert-chip"
+																		disabled={!!convertBusy}
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			void convertShelfItem(convertItem, target);
+																		}}
+																	>
+																		{convertBusy === target ? "…" : target.toUpperCase()}
+																	</button>
+																))}
+															</div>
+														)}
+													</div>
+												);
+											})()}
 											{shelfItems.length === 0 ? (
 												<div className="shelf-empty">
 													<span>Drop files or selected text here</span>
@@ -4114,6 +4216,18 @@ function App() {
 																			? `Text · ${item.text?.length ?? 0} chars`
 																			: item.name}
 																	</span>
+																	{item.type === "file" && (
+																		<button
+																			className="shelf-tile-convert"
+																			title="Convert with Filee"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				void openShelfConvert(item);
+																			}}
+																		>
+																			<ArrowRightLeft size={11} strokeWidth={2.5} />
+																		</button>
+																	)}
 																	<button
 																		className="shelf-tile-remove"
 																		title="Remove from shelf"

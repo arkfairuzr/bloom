@@ -2480,3 +2480,81 @@ img {
 		rgba(0, 0, 0, 0.3) 100%
 	);
 }
+
+/* Converting a shelf file with Filee */
+.shelf-tile-convert {
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.55);
+	color: #fff;
+	cursor: pointer;
+	z-index: 2;
+}
+
+.shelf-tile:hover .shelf-tile-convert {
+	display: flex;
+}
+
+.shelf-tile-convert:hover {
+	background: rgba(0, 0, 0, 0.8);
+}
+
+.shelf-convert {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 28px;
+	margin-bottom: 6px;
+	padding: 0 4px;
+	flex-shrink: 0;
+}
+
+.shelf-convert-label {
+	flex-shrink: 0;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.shelf-convert-chips {
+	display: flex;
+	gap: 5px;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.shelf-convert-chips::-webkit-scrollbar {
+	display: none;
+}
+
+.shelf-convert-chip {
+	flex-shrink: 0;
+	height: 22px;
+	padding: 0 9px;
+	border: none;
+	border-radius: 11px;
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.12));
+	color: var(--bloom-text, white);
+	font: inherit;
+	font-size: 10.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.shelf-convert-chip:hover:not(:disabled) {
+	background: var(--bloom-border, rgba(255, 255, 255, 0.22));
+}
+
+.shelf-convert-chip:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
