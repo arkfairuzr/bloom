@@ -27,6 +27,7 @@ import {
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
 import { FileePanel } from "./FileePanel";
+import { QueuePanel } from "./QueuePanel";
 import { useFallbackArt } from "./fallbackArt";
 import { useArtIsLight } from "./artBrightness";
 import { lyricsEnabled, useLyricRows } from "./lyrics";
@@ -59,6 +60,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Inbox,
+	ListMusic,
 	Music
 } from "lucide-react";
 
@@ -1610,9 +1612,15 @@ function App() {
 	// Converting a shelf file with Filee: the file whose formats are showing, the
 	// formats it can become, and the one being made.
 	// Files waiting on the notch's Filee page; the drop handler adds to them by ref.
+	// The Spotify queue page of the music panel.
+	const [queueOpen, setQueueOpen] = useState(false);
 	const [fileeFiles, setFileeFiles] = useState<string[]>([]);
 	const fileeAddRef = useRef<(paths: string[]) => void>(() => {});
 	fileeAddRef.current = (paths) => setFileeFiles((prev) => [...new Set([...prev, ...paths])]);
+	// The queue page belongs to the open music panel.
+	useEffect(() => {
+		if (!isOpen || bloomMode !== "music") setQueueOpen(false);
+	}, [isOpen, bloomMode]);
 	const [convertItemId, setConvertItemId] = useState<string | null>(null);
 	const [convertTargets, setConvertTargets] = useState<string[] | null>(null);
 	const [convertBusy, setConvertBusy] = useState<string | null>(null);
@@ -2872,6 +2880,7 @@ function App() {
 		}
 		if (bloomMode === "filee" && isOpen) return 440;
 		if (isMusicMode && isOpen) {
+			if (queueOpen) return 400;
 			if (showLyricsLayout) return 520;
 			return mediaLayout === "compact" ? 300 : 340;
 		}
@@ -2909,6 +2918,7 @@ function App() {
 		if (bloomMode === "status") return 36;
 		if (bloomMode === "filee" && isOpen) return 190 + MUSIC_HEADER_HEIGHT;
 		if (isMusicMode && isOpen) {
+			if (queueOpen) return 340 + MUSIC_HEADER_HEIGHT;
 			if (showLyricsLayout) return 250 + MUSIC_HEADER_HEIGHT;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
 			let h = mediaLayout === "compact" ? (hasProgressBar ? 132 : 116) : 120;
@@ -3166,7 +3176,26 @@ function App() {
 													<ChevronRight size={12} strokeWidth={2.5} />
 												</button>
 											</div>
-											{showLyricsLayout && lyricRows ? (
+											{!queueOpen && (
+												<button
+													type="button"
+													className="music-header-queue"
+													aria-label="Queue"
+													title="Spotify queue"
+													onClick={(e) => {
+														e.stopPropagation();
+														setQueueOpen(true);
+													}}
+												>
+													<ListMusic size={14} strokeWidth={2.2} />
+												</button>
+											)}
+											{queueOpen ? (
+												<QueuePanel
+													trackTitle={mediaInfo.title}
+													onClose={() => setQueueOpen(false)}
+												/>
+											) : showLyricsLayout && lyricRows ? (
 												<LyricsPlayer
 													media={mediaInfo}
 													albumArtUrl={albumArtUrl}

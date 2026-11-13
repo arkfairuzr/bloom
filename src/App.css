@@ -2558,3 +2558,24 @@ img {
 	opacity: 0.5;
 	cursor: default;
 }
+
+/* Opens the Spotify queue from the music panel */
+.music-header-queue {
+	position: absolute;
+	top: 4px;
+	right: 14px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 3px;
+	border: none;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.7));
+	cursor: pointer;
+	z-index: 12;
+}
+
+.music-header-queue:hover {
+	color: var(--bloom-text, white);
+}

@@ -9,6 +9,7 @@ mod dock_extras;
 mod files;
 mod filee;
 mod services;
+mod spotify;
 mod shelf;
 mod shelf_preview;
 mod state;
@@ -168,6 +169,7 @@ fn main() {
             get_user_name,
             set_input_focus,
             filee::filee_targets,
+            spotify::spotify_auth_listen,
             filee::filee_convert,
             power_action,
             get_app_icon,
