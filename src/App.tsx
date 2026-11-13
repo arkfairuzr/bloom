@@ -1869,8 +1869,10 @@ function App() {
 		const now = Date.now();
 		if (now - lastScrollTime.current < 250) return;
 
-		// Use absolute values to detect horizontal swipe gestures on trackpad
-		const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+		// Only a sideways scroll (trackpad swipe, Shift+wheel) switches panels; the
+		// vertical wheel is left for lists such as the Spotify queue.
+		if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+		const delta = e.deltaX;
 		if (Math.abs(delta) < 5) return; // Ignore tiny movements
 
 		if (cycleBloomMode(delta > 0 ? 1 : -1)) lastScrollTime.current = now;

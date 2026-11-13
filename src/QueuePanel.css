@@ -200,3 +200,19 @@
 	opacity: 0.6;
 	cursor: default;
 }
+
+.sq-row.clickable {
+	margin: 0 -6px;
+	padding: 4px 6px;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.sq-row.clickable:hover {
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.1));
+}
+
+.sq-row.busy {
+	opacity: 0.6;
+	cursor: default;
+}

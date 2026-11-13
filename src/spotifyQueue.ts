@@ -7,10 +7,11 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 // here and the sign-in is the PKCE flow, so no secret is needed.
 const PORT = 43821;
 export const SPOTIFY_REDIRECT_URI = `http://127.0.0.1:${PORT}/callback`;
-const SCOPES = "user-read-playback-state user-read-currently-playing";
+const SCOPES = "user-read-playback-state user-read-currently-playing user-modify-playback-state";
 
 const KEY_CLIENT = "bloom-spotify-client-id";
 const KEY_TOKENS = "bloom-spotify-tokens";
+const KEY_SCOPES = "bloom-spotify-scopes";
 
 export interface QueueTrack {
 	id: string;
@@ -62,6 +63,9 @@ const saveTokens = (tokens: Tokens | null) => write(KEY_TOKENS, tokens ? JSON.st
 
 export const isConnected = () => loadTokens() !== null;
 export const disconnect = () => saveTokens(null);
+
+/** A sign-in made before songs could be changed lacks that permission. */
+export const needsReconnect = () => isConnected() && read(KEY_SCOPES) !== SCOPES;
 
 const base64Url = (bytes: Uint8Array) =>
 	btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -131,6 +135,31 @@ export async function connect(clientId: string): Promise<void> {
 			code_verifier: verifier
 		})
 	);
+	write(KEY_SCOPES, SCOPES);
+}
+
+/**
+ * Plays the n-th song of the queue by skipping forward n+1 times. Spotify has no call
+ * that jumps to a queued song, and this keeps the rest of the queue as it was.
+ */
+export async function skipTo(index: number): Promise<void> {
+	for (let i = 0; i <= index; i++) {
+		const token = await accessToken();
+		const res = await fetch("https://api.spotify.com/v1/me/player/next", {
+			method: "POST",
+			headers: { Authorization: `Bearer ${token}` }
+		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			throw new Error(
+				res.status === 403
+					? (body?.error?.message ?? "Spotify Premium is needed to change songs")
+					: (body?.error?.message ?? `Spotify answered ${res.status}`)
+			);
+		}
+		// Let Spotify settle between skips so none is dropped.
+		await new Promise((resolve) => setTimeout(resolve, 220));
+	}
 }
 
 async function accessToken(): Promise<string> {

@@ -8,6 +8,8 @@ import {
 	disconnect,
 	getClientId,
 	isConnected,
+	needsReconnect,
+	skipTo,
 	useSpotifyQueue,
 	type QueueTrack
 } from "./spotifyQueue";
@@ -22,9 +24,23 @@ interface QueuePanelProps {
 // Pending release of the keyboard focus taken for the client id field.
 let blurTimer: number | undefined;
 
-function Row({ track, playing }: { track: QueueTrack; playing?: boolean }) {
+function Row({
+	track,
+	playing,
+	onPlay,
+	busy
+}: {
+	track: QueueTrack;
+	playing?: boolean;
+	onPlay?: () => void;
+	busy?: boolean;
+}) {
 	return (
-		<div className="sq-row">
+		<div
+			className={`sq-row${onPlay ? " clickable" : ""}${busy ? " busy" : ""}`}
+			title={onPlay ? "Play this song" : undefined}
+			onClick={onPlay}
+		>
 			<div className="sq-cover">{track.image && <img src={track.image} alt="" draggable={false} />}</div>
 			<div className="sq-text">
 				<span className={`sq-title${playing ? " playing" : ""}`}>{track.title}</span>
@@ -48,6 +64,8 @@ export function QueuePanel({ onClose, trackTitle }: QueuePanelProps) {
 	const [clientId, setClientIdText] = useState(getClientId);
 	const [busy, setBusy] = useState(false);
 	const [setupError, setSetupError] = useState<string | null>(null);
+	const [skipping, setSkipping] = useState<number | null>(null);
+	const [actionError, setActionError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (connected) void refresh();
@@ -63,6 +81,20 @@ export function QueuePanel({ onClose, trackTitle }: QueuePanelProps) {
 			setSetupError(e instanceof Error ? e.message : String(e));
 		} finally {
 			setBusy(false);
+		}
+	};
+
+	const play = async (index: number) => {
+		if (skipping !== null) return;
+		setSkipping(index);
+		setActionError(null);
+		try {
+			await skipTo(index);
+			await refresh();
+		} catch (e) {
+			setActionError(e instanceof Error ? e.message : String(e));
+		} finally {
+			setSkipping(null);
 		}
 	};
 
@@ -127,6 +159,15 @@ export function QueuePanel({ onClose, trackTitle }: QueuePanelProps) {
 			) : (
 				<div className="sq-scroll">
 					{error && <span className="sq-error">{error}</span>}
+					{actionError && <span className="sq-error">{actionError}</span>}
+					{needsReconnect() && (
+						<span className="sq-error">
+							To choose songs here, sign in to Spotify again.{" "}
+							<button type="button" className="sq-link" disabled={busy} onClick={signIn}>
+								Reconnect
+							</button>
+						</span>
+					)}
 					{queue?.current && (
 						<>
 							<div className="sq-section">Now playing</div>
@@ -139,7 +180,14 @@ export function QueuePanel({ onClose, trackTitle }: QueuePanelProps) {
 					) : queue.next.length === 0 ? (
 						<span className="sq-empty">Nothing queued. Play something in Spotify.</span>
 					) : (
-						queue.next.map((track, i) => <Row key={`${track.id}-${i}`} track={track} />)
+						queue.next.map((track, i) => (
+							<Row
+								key={`${track.id}-${i}`}
+								track={track}
+								busy={skipping !== null}
+								onPlay={() => void play(i)}
+							/>
+						))
 					)}
 					<button
 						type="button"
