@@ -123,7 +123,7 @@ export function LyricsPlayer({
 							layout="position"
 							className={`lyp-line${line.offset === 0 ? " current" : ""}`}
 							initial={{ opacity: 0 }}
-							animate={{ opacity: line.offset === 0 ? 1 : 0.4 }}
+							animate={{ opacity: line.offset === 0 ? 1 : 0.62 }}
 							transition={{ duration: 0.25 }}
 						>
 							{line.text || " "}

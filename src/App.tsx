@@ -30,7 +30,7 @@ import { FileePanel } from "./FileePanel";
 import { QueuePanel } from "./QueuePanel";
 import { SpotifySearch } from "./SpotifySearch";
 import { useFallbackArt } from "./fallbackArt";
-import { useArtIsLight } from "./artBrightness";
+import { useArtContrast } from "./artBrightness";
 import { lyricsEnabled, useLyricRows } from "./lyrics";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
@@ -2851,7 +2851,8 @@ function App() {
 	// Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
 	const isMusicMode = mediaInfo.has_media && bloomMode === "music" && settingsMusicModeEnabled;
 	// A bright cover makes a bright glow behind the player, so its text turns dark.
-	const artIsLight = useArtIsLight(isMusicMode && settingsAmbienceEnabled ? albumArtUrl : null);
+	const artContrast = useArtContrast(isMusicMode && settingsAmbienceEnabled ? albumArtUrl : null);
+	const artIsLight = artContrast.light;
 	// With time-synced lyrics for the current track the music panel changes layout.
 	const lyricRows = useLyricRows(mediaInfo, isMusicMode && lyricsEnabled());
 	const showLyricsLayout = isMusicMode && lyricRows !== null;
@@ -3086,6 +3087,16 @@ function App() {
 										transition={{ duration: 0.3 }}
 									/>
 								</AnimatePresence>
+								{artContrast.scrim > 0 && (
+									<div
+										className="notch-ambient-scrim"
+										style={{
+											background: artIsLight
+												? `rgba(255, 255, 255, ${artContrast.scrim})`
+												: `rgba(0, 0, 0, ${artContrast.scrim})`
+										}}
+									/>
+								)}
 							</motion.div>
 						)}
 					</AnimatePresence>

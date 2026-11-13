@@ -2463,7 +2463,7 @@ img {
 /* Dark text over a bright album-art glow. The players read these two variables. */
 .expanded-music-container.light-art {
 	--bloom-text: rgba(18, 18, 24, 0.92);
-	--bloom-text-muted: rgba(18, 18, 24, 0.6);
+	--bloom-text-muted: rgba(18, 18, 24, 0.72);
 	color: var(--bloom-text);
 }
 
@@ -2643,4 +2643,13 @@ img {
 .music-header-row.wide .music-search-slot {
 	padding-right: 0;
 	margin-right: 168px;
+}
+
+/* A veil over the glow that keeps the player's text readable (see artBrightness.ts) */
+.notch-ambient-scrim {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	pointer-events: none;
+	transition: background 0.4s ease;
 }
