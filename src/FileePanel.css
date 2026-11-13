@@ -1,0 +1,169 @@
+/* The notch's Filee page */
+.fp {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 10px;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+	padding: 6px 18px 14px;
+	color: var(--bloom-text, white);
+	text-align: left;
+}
+
+.fp-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	flex: 1;
+	border: 1.5px dashed var(--bloom-border, rgba(255, 255, 255, 0.22));
+	border-radius: 14px;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.65));
+}
+
+.fp-empty-title {
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.fp-button {
+	height: 26px;
+	padding: 0 14px;
+	border: none;
+	border-radius: 13px;
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.14));
+	color: var(--bloom-text, white);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.fp-button:hover {
+	background: var(--bloom-border, rgba(255, 255, 255, 0.24));
+}
+
+.fp-files {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.fp-file {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 150px;
+	height: 22px;
+	padding: 0 6px 0 9px;
+	border-radius: 11px;
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.1));
+	font-size: 11px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.fp-file button {
+	display: flex;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: inherit;
+	opacity: 0.6;
+	cursor: pointer;
+}
+
+.fp-file button:hover {
+	opacity: 1;
+}
+
+.fp-more {
+	padding: 0 9px;
+}
+
+.fp-link {
+	border: none;
+	background: transparent;
+	padding: 0 4px;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.65));
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.fp-link:hover {
+	color: var(--bloom-text, white);
+}
+
+.fp-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.fp-label {
+	flex-shrink: 0;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.65));
+}
+
+.fp-chips {
+	display: flex;
+	gap: 5px;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.fp-chips::-webkit-scrollbar {
+	display: none;
+}
+
+.fp-chip {
+	flex-shrink: 0;
+	height: 24px;
+	padding: 0 10px;
+	border: none;
+	border-radius: 12px;
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.12));
+	color: var(--bloom-text, white);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.fp-chip:hover:not(:disabled) {
+	background: var(--bloom-border, rgba(255, 255, 255, 0.24));
+}
+
+.fp-chip:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.fp-wait,
+.fp-hint {
+	font-size: 11px;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.55));
+}
+
+.fp-status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 18px;
+	font-size: 11px;
+}
+
+.fp-error {
+	font-size: 11px;
+	color: #ff8a80;
+	text-align: center;
+}

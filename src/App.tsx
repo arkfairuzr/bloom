@@ -26,6 +26,7 @@ import {
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
+import { FileePanel } from "./FileePanel";
 import { useFallbackArt } from "./fallbackArt";
 import { useArtIsLight } from "./artBrightness";
 import { lyricsEnabled, useLyricRows } from "./lyrics";
@@ -471,7 +472,8 @@ type BloomMode =
 	| "status"
 	| "shelf"
 	| "wifi"
-	| "bluetooth";
+	| "bluetooth"
+	| "filee";
 
 // The shelf is a short-lived stash: one row, newest first, oldest evicted.
 const SHELF_MAX_ITEMS = 10;
@@ -1550,6 +1552,7 @@ function App() {
 		}
 		setBloomMode((prev) =>
 			prev === "music" ||
+			prev === "filee" ||
 			prev === "command-center" ||
 			prev === "calendar" ||
 			prev === "status" ||
@@ -1606,6 +1609,10 @@ function App() {
 	const [shelfNotice, setShelfNotice] = useState<string | null>(null);
 	// Converting a shelf file with Filee: the file whose formats are showing, the
 	// formats it can become, and the one being made.
+	// Files waiting on the notch's Filee page; the drop handler adds to them by ref.
+	const [fileeFiles, setFileeFiles] = useState<string[]>([]);
+	const fileeAddRef = useRef<(paths: string[]) => void>(() => {});
+	fileeAddRef.current = (paths) => setFileeFiles((prev) => [...new Set([...prev, ...paths])]);
 	const [convertItemId, setConvertItemId] = useState<string | null>(null);
 	const [convertTargets, setConvertTargets] = useState<string[] | null>(null);
 	const [convertBusy, setConvertBusy] = useState<string | null>(null);
@@ -1758,7 +1765,7 @@ function App() {
 			console.info("[shelf] drag-enter:", event.payload.paths ?? event.payload.text);
 			setIsDragHovering(true);
 			const prev = bloomModeRef.current;
-			if (prev === "announcement" || prev === "shelf") return;
+			if (prev === "announcement" || prev === "shelf" || prev === "filee") return;
 			shelfPrevModeRef.current = prev;
 			shelfPrevOpenRef.current = isOpenRef.current;
 			shelfDragActiveRef.current = true;
@@ -1783,6 +1790,11 @@ function App() {
 			const text = event.payload.text;
 			console.info("[shelf] drop:", paths.length > 0 ? paths : text);
 			if (paths.length === 0 && !text) return;
+			// Dropped on the Filee page, the files wait there to be converted.
+			if (bloomModeRef.current === "filee" && paths.length > 0) {
+				fileeAddRef.current(paths);
+				return;
+			}
 			if (paths.length > 0) addShelfItems(paths);
 			if (text) addShelfText(text);
 			if (bloomModeRef.current !== "announcement") {
@@ -1863,16 +1875,18 @@ function App() {
 	// Music and shelf remain entry points through their activity affordances.
 	// The panels the arrows and wheel move through: the tool panels, plus the
 	// music player while a media session exists.
-	function cyclablePanels(): (NotchPanel | "music")[] {
-		const panels: (NotchPanel | "music")[] = NOTCH_PANELS.filter(panelAvailable);
+	function cyclablePanels(): (NotchPanel | "music" | "filee")[] {
+		const panels: (NotchPanel | "music" | "filee")[] = NOTCH_PANELS.filter(panelAvailable);
 		if (settingsMusicModeEnabled && mediaInfo.has_media) panels.push("music");
+		// Filee, the file converter, always sits last.
+		if (localStorage.getItem("bloom-filee-panel-enabled") !== "false") panels.push("filee");
 		return panels;
 	}
 
 	const cycleBloomMode = (direction: 1 | -1) => {
 		if (bloomMode === "announcement") return false;
 		const panels = cyclablePanels();
-		const currentIndex = panels.indexOf(bloomMode as NotchPanel | "music");
+		const currentIndex = panels.indexOf(bloomMode as NotchPanel | "music" | "filee");
 		const nextMode = currentIndex === -1
 			? openingPanel()
 			: panels[(currentIndex + direction + panels.length) % panels.length];
@@ -1884,7 +1898,7 @@ function App() {
 	// Arrows and wheel both stay within panels once one is open.
 	const cyclePanel = (direction: 1 | -1) => {
 		const panels = cyclablePanels();
-		const index = panels.indexOf(bloomMode as NotchPanel | "music");
+		const index = panels.indexOf(bloomMode as NotchPanel | "music" | "filee");
 		if (index === -1 || panels.length < 2) return;
 		setBloomMode(panels[(index + direction + panels.length) % panels.length]);
 	};
@@ -2112,11 +2126,11 @@ function App() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// The music panel stays open when the pointer leaves, even in smart mode. Moving
+	// The music and Filee panels stay open when the pointer leaves, even in smart mode. Moving
 	// to another panel lets go, and the notch then closes at once if the pointer is away.
 	const musicPinnedRef = useRef(false);
 	useEffect(() => {
-		const want = isOpen && bloomMode === "music";
+		const want = isOpen && (bloomMode === "music" || bloomMode === "filee");
 		if (want === musicPinnedRef.current) return;
 		musicPinnedRef.current = want;
 		setNotchPinned(want);
@@ -2856,6 +2870,7 @@ function App() {
 			const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
 			return Math.max(Math.min(200 + totalWidgets * 50, 380) - clock24hTrim, statusFitWidth);
 		}
+		if (bloomMode === "filee" && isOpen) return 440;
 		if (isMusicMode && isOpen) {
 			if (showLyricsLayout) return 520;
 			return mediaLayout === "compact" ? 300 : 340;
@@ -2892,6 +2907,7 @@ function App() {
 		if (bloomMode === "command-center") return isOpen ? 230 : 36;
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return 300;
 		if (bloomMode === "status") return 36;
+		if (bloomMode === "filee" && isOpen) return 190 + MUSIC_HEADER_HEIGHT;
 		if (isMusicMode && isOpen) {
 			if (showLyricsLayout) return 250 + MUSIC_HEADER_HEIGHT;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
@@ -2908,7 +2924,7 @@ function App() {
 	// Arrows switch between the panels (calendar, controls, music); wheel/swipe can also open one
 	// directly from the collapsed pill or a live activity.
 	const showPanelArrows =
-		isOpen && cyclablePanels().includes(bloomMode as NotchPanel | "music") && cyclablePanels().length > 1;
+		isOpen && cyclablePanels().includes(bloomMode as NotchPanel | "music" | "filee") && cyclablePanels().length > 1;
 
 	// Close compact media player expansions when notch is unhovered or mode changes
 	useEffect(() => {
@@ -3078,7 +3094,44 @@ function App() {
 							>
 								{/* Faster Waiting Transition Area */}
 								<AnimatePresence mode="wait">
-									{isOpen && isMusicMode && !isCalendarMode ? (
+									{isOpen && bloomMode === "filee" ? (
+										<motion.div
+											key="expanded-filee"
+											className="expanded-music-container"
+											style={{ paddingTop: MUSIC_HEADER_HEIGHT }}
+											initial={{ opacity: 0, scale: 0.98 }}
+											animate={{ opacity: 1, scale: 1 }}
+											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 500, damping: 30 }}
+										>
+											<div className="music-header">
+												<button
+													type="button"
+													className="music-header-arrow"
+													aria-label="Previous panel"
+													onClick={(e) => {
+														e.stopPropagation();
+														cyclePanel(-1);
+													}}
+												>
+													<ChevronLeft size={12} strokeWidth={2.5} />
+												</button>
+												<span className="music-header-time">{time}</span>
+												<button
+													type="button"
+													className="music-header-arrow"
+													aria-label="Next panel"
+													onClick={(e) => {
+														e.stopPropagation();
+														cyclePanel(1);
+													}}
+												>
+													<ChevronRight size={12} strokeWidth={2.5} />
+												</button>
+											</div>
+											<FileePanel files={fileeFiles} onFilesChange={setFileeFiles} />
+										</motion.div>
+									) : isOpen && isMusicMode && !isCalendarMode ? (
 										<motion.div
 											key="expanded-music"
 											className={`expanded-music-container${artIsLight ? " light-art" : ""}`}
