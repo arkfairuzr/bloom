@@ -113,16 +113,36 @@ pub async fn filee_targets(app: AppHandle, path: String) -> Result<Vec<String>, 
     .map_err(|e| e.to_string())?
 }
 
-/// Converts one file and returns the files it wrote.
+/// Converts one file and returns the files it wrote. With `to_temp` the results go to
+/// a fresh temporary folder instead of beside the original, for the caller to save.
 #[tauri::command]
 pub async fn filee_convert(
     app: AppHandle,
     path: String,
     to: String,
+    to_temp: Option<bool>,
 ) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let cli = find_cli(&app).ok_or_else(|| NOT_FOUND.to_string())?;
-        let output = run(&cli, &["convert", &path, "--to", &to, "--json"])?;
+        let mut args = vec!["convert", path.as_str(), "--to", to.as_str(), "--json"];
+        let temp_dir = if to_temp.unwrap_or(false) {
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            let dir = std::env::temp_dir()
+                .join("bloom-filee")
+                .join(stamp.to_string());
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            Some(dir.to_string_lossy().to_string())
+        } else {
+            None
+        };
+        if let Some(dir) = temp_dir.as_deref() {
+            args.push("-o");
+            args.push(dir);
+        }
+        let output = run(&cli, &args)?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) else {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -142,6 +162,49 @@ pub async fn filee_convert(
             return Err(reason);
         }
         Ok(outputs)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Moves converted files out of the temporary folder to where the user chose.
+/// One file goes to the exact path chosen in a Save dialog; several go into the
+/// chosen folder, numbered when a name is taken.
+#[tauri::command]
+pub async fn filee_save(from: Vec<String>, dest: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dest = PathBuf::from(dest);
+        let mut saved = Vec::new();
+        if from.len() == 1 && !dest.is_dir() {
+            std::fs::copy(&from[0], &dest).map_err(|e| format!("Couldn't save: {e}"))?;
+            let _ = std::fs::remove_file(&from[0]);
+            saved.push(dest.to_string_lossy().to_string());
+            return Ok(saved);
+        }
+        std::fs::create_dir_all(&dest).map_err(|e| format!("Couldn't save: {e}"))?;
+        for source in &from {
+            let source = Path::new(source);
+            let name = source.file_name().ok_or("Bad file name")?;
+            let mut target = dest.join(name);
+            let mut n = 2;
+            while target.exists() {
+                let stem = source
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("file");
+                let ext = source
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| format!(".{e}"))
+                    .unwrap_or_default();
+                target = dest.join(format!("{stem} ({n}){ext}"));
+                n += 1;
+            }
+            std::fs::copy(source, &target).map_err(|e| format!("Couldn't save: {e}"))?;
+            let _ = std::fs::remove_file(source);
+            saved.push(target.to_string_lossy().to_string());
+        }
+        Ok(saved)
     })
     .await
     .map_err(|e| e.to_string())?

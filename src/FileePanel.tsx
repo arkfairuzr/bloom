@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FileUp, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileUp, X } from "lucide-react";
 import "./FileePanel.css";
 
 interface FileePanelProps {
@@ -47,11 +47,17 @@ export function FileePanel({ files, onFilesChange }: FileePanelProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState<{ target: string; done: number } | null>(null);
 	const [outputs, setOutputs] = useState<string[]>([]);
+	// Converted files still in the temporary folder, waiting for the user to pick where they go.
+	const [pending, setPending] = useState<string[]>([]);
+	const chipsRef = useRef<HTMLDivElement>(null);
+	const scrollChips = (direction: 1 | -1) =>
+		chipsRef.current?.scrollBy({ left: direction * 160, behavior: "smooth" });
 
 	// The formats every chosen file can become.
 	const extensions = useMemo(() => [...new Set(files.map(extOf).filter(Boolean))].slice(0, 6), [files]);
 	useEffect(() => {
 		setOutputs([]);
+		setPending([]);
 		setError(null);
 		if (extensions.length === 0) {
 			setTargets(null);
@@ -90,23 +96,55 @@ export function FileePanel({ files, onFilesChange }: FileePanelProps) {
 		}
 	};
 
+	// Asks where to save the converted files, in a Windows Save dialog (one file) or a
+	// folder picker (several), then moves them there.
+	const saveOutputs = async (made: string[]) => {
+		try {
+			const { open, save } = await import("@tauri-apps/plugin-dialog");
+			let dest: string | null;
+			if (made.length === 1) {
+				const ext = extOf(made[0]);
+				dest = await save({
+					title: "Save converted file",
+					defaultPath: `${dirOf(files[0])}\\${nameOf(made[0])}`,
+					filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : undefined
+				});
+			} else {
+				const picked = await open({ directory: true, title: "Choose where to save the converted files" });
+				dest = typeof picked === "string" ? picked : null;
+			}
+			if (!dest) {
+				setPending(made);
+				return;
+			}
+			setOutputs(await invoke<string[]>("filee_save", { from: made, dest }));
+			setPending([]);
+		} catch (e) {
+			setPending(made);
+			setError(String(e));
+		}
+	};
+
 	const convert = async (target: string) => {
 		if (busy) return;
 		setError(null);
 		setOutputs([]);
+		setPending([]);
 		const made: string[] = [];
 		let failed: string | null = null;
 		for (let i = 0; i < files.length; i++) {
 			setBusy({ target, done: i });
 			try {
-				made.push(...(await invoke<string[]>("filee_convert", { path: files[i], to: target })));
+				made.push(
+					...(await invoke<string[]>("filee_convert", { path: files[i], to: target, toTemp: true }))
+				);
 			} catch (e) {
 				failed = `${nameOf(files[i])}: ${String(e).slice(0, 90)}`;
 			}
 		}
 		setBusy(null);
-		setOutputs(made);
 		if (failed) setError(failed);
+		if (made.length > 0) await saveOutputs(made);
 	};
 
 	const shown = files.slice(0, 4);
@@ -155,7 +193,23 @@ export function FileePanel({ files, onFilesChange }: FileePanelProps) {
 						) : targets.length === 0 ? (
 							<span className="fp-wait">No common format</span>
 						) : (
-							<div className="fp-chips">
+							<>
+							<button
+								type="button"
+								className="fp-scroll"
+								aria-label="Earlier formats"
+								onClick={() => scrollChips(-1)}
+							>
+								<ChevronLeft size={14} strokeWidth={2.5} />
+							</button>
+							<div
+								ref={chipsRef}
+								className="fp-chips"
+								// The wheel moves the row sideways; there is no vertical scrolling here.
+								onWheel={(e) => {
+									e.currentTarget.scrollLeft += e.deltaY;
+								}}
+							>
 								{targets.map((target) => (
 									<button
 										key={target}
@@ -168,12 +222,28 @@ export function FileePanel({ files, onFilesChange }: FileePanelProps) {
 									</button>
 								))}
 							</div>
+							<button
+								type="button"
+								className="fp-scroll"
+								aria-label="More formats"
+								onClick={() => scrollChips(1)}
+							>
+								<ChevronRight size={14} strokeWidth={2.5} />
+							</button>
+							</>
 						)}
 					</div>
 
 					<div className="fp-status">
 						{error ? (
 							<span className="fp-error">{error}</span>
+						) : pending.length > 0 ? (
+							<>
+								<span>Converted, not saved yet</span>
+								<button type="button" className="fp-link" onClick={() => void saveOutputs(pending)}>
+									Save as…
+								</button>
+							</>
 						) : outputs.length > 0 ? (
 							<>
 								<span>Saved {outputs.length === 1 ? nameOf(outputs[0]) : `${outputs.length} files`}</span>
@@ -186,7 +256,7 @@ export function FileePanel({ files, onFilesChange }: FileePanelProps) {
 								</button>
 							</>
 						) : (
-							<span className="fp-hint">Results are saved next to the originals</span>
+							<span className="fp-hint">After converting you choose where to save</span>
 						)}
 					</div>
 				</>

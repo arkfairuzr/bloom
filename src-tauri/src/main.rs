@@ -171,6 +171,7 @@ fn main() {
             filee::filee_targets,
             spotify::spotify_auth_listen,
             filee::filee_convert,
+            filee::filee_save,
             power_action,
             get_app_icon,
             get_installed_apps,

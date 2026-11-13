@@ -2579,3 +2579,32 @@ img {
 .music-header-queue:hover {
 	color: var(--bloom-text, white);
 }
+
+/* Player on the left, Spotify queue on the right */
+.music-main {
+	flex: 1 1 0;
+	min-width: 0;
+	height: 100%;
+}
+
+.music-queue-side {
+	flex: 0 0 300px;
+	width: 300px;
+	height: 100%;
+	box-sizing: border-box;
+	border-left: 1px solid var(--bloom-border, rgba(255, 255, 255, 0.12));
+}
+
+.shelf-convert-chips {
+	padding-bottom: 5px;
+}
+
+.shelf-convert-chips::-webkit-scrollbar {
+	display: block;
+	height: 4px;
+}
+
+.shelf-convert-chips::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.35);
+	border-radius: 2px;
+}

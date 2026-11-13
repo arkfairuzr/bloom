@@ -188,3 +188,19 @@
 .light-art .lyp-art {
 	background: rgba(18, 18, 24, 0.08);
 }
+
+/* The queue toggle sits at the right end of the controls */
+.lyp-controls {
+	position: relative;
+}
+
+.lyp-queue {
+	position: absolute;
+	right: 0;
+	opacity: 0.7;
+}
+
+.lyp-queue:hover,
+.lyp-queue.on {
+	opacity: 1;
+}

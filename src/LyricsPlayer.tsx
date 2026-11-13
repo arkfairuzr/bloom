@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
+import { ListMusic } from "lucide-react";
 import { MusicNoteIcon, PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons";
 import { LEAD_MS, type LyricRow, type LyricsMedia } from "./lyrics";
 import "./LyricsPlayer.css";
@@ -14,6 +15,9 @@ interface LyricsPlayerProps {
 	onTogglePlayPause: () => void;
 	onPrev: () => void;
 	onNext: () => void;
+	/** Opens or closes the queue beside the player. */
+	onQueue?: () => void;
+	queueOpen?: boolean;
 }
 
 // How many lines show above and below the one being sung.
@@ -36,7 +40,9 @@ export function LyricsPlayer({
 	rows,
 	onTogglePlayPause,
 	onPrev,
-	onNext
+	onNext,
+	onQueue,
+	queueOpen
 }: LyricsPlayerProps) {
 	const duration = media.duration_ms ?? 0;
 	const mediaRef = useRef(media);
@@ -153,6 +159,19 @@ export function LyricsPlayer({
 					>
 						<SkipForwardIcon size={24} />
 					</button>
+					{onQueue && (
+						<button
+							className={`lyp-btn lyp-queue${queueOpen ? " on" : ""}`}
+							title="Queue"
+							aria-label="Queue"
+							onClick={(e) => {
+								e.stopPropagation();
+								onQueue();
+							}}
+						>
+							<ListMusic size={18} strokeWidth={2.2} />
+						</button>
+					)}
 				</div>
 
 				{duration > 0 && (

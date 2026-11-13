@@ -76,6 +76,8 @@ import {
  */
 // Room for the clock and panel arrows above the open music player.
 const MUSIC_HEADER_HEIGHT = 26;
+// Width the Spotify queue adds beside the music player.
+const QUEUE_WIDTH = 300;
 
 // Formats shown first when converting a shelf file; the rest follow in Filee's order.
 const CONVERT_PRIORITY = [
@@ -2880,9 +2882,8 @@ function App() {
 		}
 		if (bloomMode === "filee" && isOpen) return 440;
 		if (isMusicMode && isOpen) {
-			if (queueOpen) return 400;
-			if (showLyricsLayout) return 520;
-			return mediaLayout === "compact" ? 300 : 340;
+			const base = showLyricsLayout ? 520 : mediaLayout === "compact" ? 300 : 340;
+			return base + (queueOpen ? QUEUE_WIDTH : 0);
 		}
 		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
@@ -2918,13 +2919,14 @@ function App() {
 		if (bloomMode === "status") return 36;
 		if (bloomMode === "filee" && isOpen) return 190 + MUSIC_HEADER_HEIGHT;
 		if (isMusicMode && isOpen) {
-			if (queueOpen) return 340 + MUSIC_HEADER_HEIGHT;
 			if (showLyricsLayout) return 250 + MUSIC_HEADER_HEIGHT;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
 			let h = mediaLayout === "compact" ? (hasProgressBar ? 132 : 116) : 120;
 			if (mediaLayout === "compact") {
 				if (compactVolumeExpanded) h += 36;
 			}
+			// The queue beside the player needs room for a few rows.
+			if (queueOpen) h = Math.max(h, 250);
 			return h + MUSIC_HEADER_HEIGHT;
 		}
 		return 36;
@@ -3151,7 +3153,10 @@ function App() {
 											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
 											transition={{ type: "spring", stiffness: 500, damping: 30 }}
 										>
-											<div className="music-header">
+											<div
+												className="music-header"
+												style={queueOpen ? { left: `calc(50% - ${QUEUE_WIDTH / 2}px)` } : undefined}
+											>
 												<button
 													type="button"
 													className="music-header-arrow"
@@ -3176,7 +3181,7 @@ function App() {
 													<ChevronRight size={12} strokeWidth={2.5} />
 												</button>
 											</div>
-											{!queueOpen && (
+											{!(showLyricsLayout && lyricRows) && (
 												<button
 													type="button"
 													className="music-header-queue"
@@ -3184,19 +3189,17 @@ function App() {
 													title="Spotify queue"
 													onClick={(e) => {
 														e.stopPropagation();
-														setQueueOpen(true);
+														setQueueOpen((open) => !open);
 													}}
 												>
 													<ListMusic size={14} strokeWidth={2.2} />
 												</button>
 											)}
-											{queueOpen ? (
-												<QueuePanel
-													trackTitle={mediaInfo.title}
-													onClose={() => setQueueOpen(false)}
-												/>
-											) : showLyricsLayout && lyricRows ? (
+											<div className="music-main">
+											{showLyricsLayout && lyricRows ? (
 												<LyricsPlayer
+													onQueue={() => setQueueOpen((open) => !open)}
+													queueOpen={queueOpen}
 													media={mediaInfo}
 													albumArtUrl={albumArtUrl}
 													albumArtKey={albumArtKey}
@@ -3454,6 +3457,12 @@ function App() {
 															<VolumeHighIcon size={14} style={{ opacity: 0.5 }} />
 														</div>
 													</div>
+												</div>
+											)}
+											</div>
+											{queueOpen && (
+												<div className="music-queue-side">
+													<QueuePanel trackTitle={mediaInfo.title} onClose={() => setQueueOpen(false)} />
 												</div>
 											)}
 										</motion.div>
