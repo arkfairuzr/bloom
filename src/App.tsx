@@ -27,6 +27,7 @@ import {
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { LyricsPlayer } from "./LyricsPlayer";
 import { FileePanel } from "./FileePanel";
+import { MousePanel, loadMapperConfig } from "./MousePanel";
 import { QueuePanel } from "./QueuePanel";
 import { SpotifySearch } from "./SpotifySearch";
 import { useFallbackArt } from "./fallbackArt";
@@ -478,7 +479,8 @@ type BloomMode =
 	| "shelf"
 	| "wifi"
 	| "bluetooth"
-	| "filee";
+	| "filee"
+	| "mouse";
 
 // The shelf is a short-lived stash: one row, newest first, oldest evicted.
 const SHELF_MAX_ITEMS = 10;
@@ -1558,6 +1560,7 @@ function App() {
 		setBloomMode((prev) =>
 			prev === "music" ||
 			prev === "filee" ||
+			prev === "mouse" ||
 			prev === "command-center" ||
 			prev === "calendar" ||
 			prev === "status" ||
@@ -1620,6 +1623,26 @@ function App() {
 	const [fileeFiles, setFileeFiles] = useState<string[]>([]);
 	const fileeAddRef = useRef<(paths: string[]) => void>(() => {});
 	fileeAddRef.current = (paths) => setFileeFiles((prev) => [...new Set([...prev, ...paths])]);
+	// The side-button mapper's settings go to the backend at startup, once they exist.
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		invoke<Record<string, unknown>>("load_settings")
+			.then((settings) => {
+				const raw = settings["bloom-mouse-mapper"];
+				if (typeof raw === "string") {
+					try {
+						localStorage.setItem("bloom-mouse-mapper", raw);
+					} catch {
+						/* storage unavailable */
+					}
+				}
+				if (localStorage.getItem("bloom-mouse-mapper")) {
+					invoke("mouse_mapper_apply", { configIn: loadMapperConfig() }).catch(() => {});
+				}
+			})
+			.catch(() => {});
+	}, [windowLabel]);
+
 	// The queue page belongs to the open music panel.
 	useEffect(() => {
 		if (!isOpen || bloomMode !== "music") setQueueOpen(false);
@@ -1888,18 +1911,20 @@ function App() {
 	// Music and shelf remain entry points through their activity affordances.
 	// The panels the arrows and wheel move through: the tool panels, plus the
 	// music player while a media session exists.
-	function cyclablePanels(): (NotchPanel | "music" | "filee")[] {
-		const panels: (NotchPanel | "music" | "filee")[] = NOTCH_PANELS.filter(panelAvailable);
+	function cyclablePanels(): (NotchPanel | "music" | "filee" | "mouse")[] {
+		const panels: (NotchPanel | "music" | "filee" | "mouse")[] = NOTCH_PANELS.filter(panelAvailable);
 		if (settingsMusicModeEnabled && mediaInfo.has_media) panels.push("music");
 		// Filee, the file converter, always sits last.
 		if (localStorage.getItem("bloom-filee-panel-enabled") !== "false") panels.push("filee");
+		// The mouse side-button mapper follows Filee.
+		if (localStorage.getItem("bloom-mouse-panel-enabled") !== "false") panels.push("mouse");
 		return panels;
 	}
 
 	const cycleBloomMode = (direction: 1 | -1) => {
 		if (bloomMode === "announcement") return false;
 		const panels = cyclablePanels();
-		const currentIndex = panels.indexOf(bloomMode as NotchPanel | "music" | "filee");
+		const currentIndex = panels.indexOf(bloomMode as NotchPanel | "music" | "filee" | "mouse");
 		const nextMode = currentIndex === -1
 			? openingPanel()
 			: panels[(currentIndex + direction + panels.length) % panels.length];
@@ -1911,7 +1936,7 @@ function App() {
 	// Arrows and wheel both stay within panels once one is open.
 	const cyclePanel = (direction: 1 | -1) => {
 		const panels = cyclablePanels();
-		const index = panels.indexOf(bloomMode as NotchPanel | "music" | "filee");
+		const index = panels.indexOf(bloomMode as NotchPanel | "music" | "filee" | "mouse");
 		if (index === -1 || panels.length < 2) return;
 		setBloomMode(panels[(index + direction + panels.length) % panels.length]);
 	};
@@ -2143,7 +2168,7 @@ function App() {
 	// to another panel lets go, and the notch then closes at once if the pointer is away.
 	const musicPinnedRef = useRef(false);
 	useEffect(() => {
-		const want = isOpen && (bloomMode === "music" || bloomMode === "filee");
+		const want = isOpen && (bloomMode === "music" || bloomMode === "filee" || bloomMode === "mouse");
 		if (want === musicPinnedRef.current) return;
 		musicPinnedRef.current = want;
 		setNotchPinned(want);
@@ -2884,7 +2909,7 @@ function App() {
 			const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
 			return Math.max(Math.min(200 + totalWidgets * 50, 380) - clock24hTrim, statusFitWidth);
 		}
-		if (bloomMode === "filee" && isOpen) return 440;
+		if ((bloomMode === "filee" || bloomMode === "mouse") && isOpen) return 440;
 		if (isMusicMode && isOpen) {
 			const base = showLyricsLayout ? 520 : mediaLayout === "compact" ? 300 : 340;
 			return base + (queueOpen ? QUEUE_WIDTH : 0);
@@ -2922,6 +2947,7 @@ function App() {
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return 300;
 		if (bloomMode === "status") return 36;
 		if (bloomMode === "filee" && isOpen) return 190 + MUSIC_HEADER_HEIGHT;
+		if (bloomMode === "mouse" && isOpen) return 220 + MUSIC_HEADER_HEIGHT;
 		if (isMusicMode && isOpen) {
 			if (showLyricsLayout) return 250 + MUSIC_HEADER_HEIGHT;
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
@@ -2940,7 +2966,7 @@ function App() {
 	// Arrows switch between the panels (calendar, controls, music); wheel/swipe can also open one
 	// directly from the collapsed pill or a live activity.
 	const showPanelArrows =
-		isOpen && cyclablePanels().includes(bloomMode as NotchPanel | "music" | "filee") && cyclablePanels().length > 1;
+		isOpen && cyclablePanels().includes(bloomMode as NotchPanel | "music" | "filee" | "mouse") && cyclablePanels().length > 1;
 
 	// Close compact media player expansions when notch is unhovered or mode changes
 	useEffect(() => {
@@ -3156,6 +3182,43 @@ function App() {
 												</button>
 											</div>
 											<FileePanel files={fileeFiles} onFilesChange={setFileeFiles} />
+										</motion.div>
+									) : isOpen && bloomMode === "mouse" ? (
+										<motion.div
+											key="expanded-mouse"
+											className="expanded-music-container"
+											style={{ paddingTop: MUSIC_HEADER_HEIGHT }}
+											initial={{ opacity: 0, scale: 0.98 }}
+											animate={{ opacity: 1, scale: 1 }}
+											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 500, damping: 30 }}
+										>
+											<div className="music-header">
+												<button
+													type="button"
+													className="music-header-arrow"
+													aria-label="Previous panel"
+													onClick={(e) => {
+														e.stopPropagation();
+														cyclePanel(-1);
+													}}
+												>
+													<ChevronLeft size={12} strokeWidth={2.5} />
+												</button>
+												<span className="music-header-time">{time}</span>
+												<button
+													type="button"
+													className="music-header-arrow"
+													aria-label="Next panel"
+													onClick={(e) => {
+														e.stopPropagation();
+														cyclePanel(1);
+													}}
+												>
+													<ChevronRight size={12} strokeWidth={2.5} />
+												</button>
+											</div>
+											<MousePanel />
 										</motion.div>
 									) : isOpen && isMusicMode && !isCalendarMode ? (
 										<motion.div

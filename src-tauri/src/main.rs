@@ -8,10 +8,11 @@ mod diagnostics;
 mod dock_extras;
 mod files;
 mod filee;
+mod mouse_mapper;
 mod services;
-mod spotify;
 mod shelf;
 mod shelf_preview;
+mod spotify;
 mod state;
 mod tray;
 mod types;
@@ -170,6 +171,8 @@ fn main() {
             set_input_focus,
             filee::filee_targets,
             spotify::spotify_auth_listen,
+            mouse_mapper::mouse_mapper_apply,
+            mouse_mapper::mouse_mapper_last_button,
             filee::filee_convert,
             filee::filee_save,
             power_action,

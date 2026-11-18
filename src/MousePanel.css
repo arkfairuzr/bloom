@@ -1,0 +1,147 @@
+/* The notch's Mouse page */
+.mp {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+	padding: 4px 18px 12px;
+	color: var(--bloom-text, white);
+	text-align: left;
+}
+
+.mp-columns {
+	display: flex;
+	flex: 1;
+	gap: 14px;
+	min-height: 0;
+}
+
+.mp-column {
+	display: flex;
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: visible;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.mp-divider {
+	width: 1px;
+	background: var(--bloom-border, rgba(255, 255, 255, 0.14));
+}
+
+.mp-title {
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.mp-picker {
+	position: relative;
+}
+
+.mp-select {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	width: 100%;
+	height: 26px;
+	padding: 0 10px;
+	box-sizing: border-box;
+	border: none;
+	border-radius: 8px;
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.12));
+	color: var(--bloom-text, white);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.mp-select span {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.mp-options {
+	position: absolute;
+	top: 30px;
+	left: 0;
+	right: 0;
+	z-index: 40;
+	padding: 4px;
+	border-radius: 10px;
+	background: rgba(18, 18, 22, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+.mp-option {
+	display: block;
+	width: 100%;
+	padding: 5px 8px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: #fff;
+	font: inherit;
+	font-size: 11px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.mp-option:hover {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.mp-option.on {
+	font-weight: 700;
+}
+
+.mp-input {
+	height: 26px;
+	padding: 0 9px;
+	box-sizing: border-box;
+	border: 1px solid var(--bloom-border, rgba(255, 255, 255, 0.16));
+	border-radius: 8px;
+	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.06));
+	color: var(--bloom-text, white);
+	font: inherit;
+	font-size: 11px;
+	outline: none;
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+.mp-input:disabled {
+	opacity: 0.4;
+}
+
+.mp-hint {
+	white-space: normal;
+	overflow-wrap: anywhere;
+	font-size: 10px;
+	line-height: 1.3;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.mp-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-shrink: 0;
+	font-size: 11px;
+}
+
+.mp-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+.mp-last {
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.6));
+}
