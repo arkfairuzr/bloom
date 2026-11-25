@@ -22,6 +22,9 @@ pub static TRAY_INTERACTION_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 pub static DOCK_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
+/// The dock bar as last seen fully shown. While the dock is hidden it shrinks to a small
+/// pill, so overlap detection must look at this extent, or it would flip with the dock.
+pub static DOCK_FULL_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
 pub static NOTCH_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
 pub static DOCK_IS_HOVERED: AtomicBool = AtomicBool::new(false);
 pub static NOTCH_IS_HOVERED: AtomicBool = AtomicBool::new(false);

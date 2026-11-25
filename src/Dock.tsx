@@ -266,6 +266,8 @@ const Dock = memo(function Dock() {
 	const [isReady, setIsReady] = useState(false);
 	const [isImpacted, setIsImpacted] = useState(false);
 	const [isExpanded, setIsExpanded] = useState(false);
+	// Whether the bar is fully shown, for the callbacks that report its size.
+	const dockShownRef = useRef(false);
 	const [startupAnimating, setStartupAnimating] = useState(false);
 	const [customIcons, setCustomIcons] = useState<Record<string, string>>({});
 	const [toast, setToast] = useState<string | null>(null);
@@ -340,6 +342,7 @@ const Dock = memo(function Dock() {
 		!startupAnimating &&
 		((dockMode === "smart" && isOverlapped && interactionState === "none") ||
 			(dockMode === "peek" && interactionState === "none"));
+	dockShownRef.current = isExpanded && !isHidden && isVisible;
 
 	// Adaptive mode (fixed dock only): stretch into a full-width taskbar while a
 	// standard maximized window is in the foreground, so the reserved strip no
@@ -399,6 +402,15 @@ const Dock = memo(function Dock() {
 				const rect = dockRef.current.getBoundingClientRect();
 				const hasPreview = !!previewData;
 				invoke("update_dock_rect", {
+					// The bar alone, while it is fully shown: it shrinks to a pill when hidden.
+					bare: dockShownRef.current
+						? {
+								x: Math.round(rect.x),
+								y: Math.round(rect.y),
+								width: Math.round(rect.width),
+								height: Math.round(rect.height)
+							}
+						: null,
 					rect: {
 						x: Math.round(rect.x) - (hasPreview ? 500 : 0),
 						y: Math.round(rect.y) - (hasPreview ? 320 : 0),

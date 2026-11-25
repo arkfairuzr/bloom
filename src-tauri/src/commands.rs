@@ -122,9 +122,15 @@ pub fn shelf_drag_icon() -> Option<String> {
 }
 
 #[tauri::command]
-pub async fn update_dock_rect(rect: IntRect) {
+pub async fn update_dock_rect(rect: IntRect, bare: Option<IntRect>) {
     if let Ok(mut r) = DOCK_RECT.lock() {
         *r = Some(rect);
+    }
+    // `bare` is the dock bar itself, sent only while it is fully shown.
+    if let Some(full) = bare.filter(|b| b.width >= 60) {
+        if let Ok(mut r) = DOCK_FULL_RECT.lock() {
+            *r = Some(full);
+        }
     }
 }
 

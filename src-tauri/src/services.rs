@@ -1662,8 +1662,16 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                         should_maximized = is_maximized && !current_is_fs;
                                     } else if is_primary {
                                         should_overlap = false;
-                                        if let Ok(dock_rect_lock) = DOCK_RECT.lock() {
-                                            if let Some(dr) = *dock_rect_lock {
+                                        // The dock's extent when fully shown: its current box
+                                        // shrinks to a pill while hidden, and testing against
+                                        // that would make the dock flip between shown and hidden.
+                                        let dock_extent = DOCK_FULL_RECT
+                                            .lock()
+                                            .ok()
+                                            .and_then(|r| *r)
+                                            .or_else(|| DOCK_RECT.lock().ok().and_then(|r| *r));
+                                        if let Some(dr) = dock_extent {
+                                            {
                                                 let scale = cached_scale;
                                                 let d_left = (dr.x as f64 * scale) as i32;
                                                 let d_right =
