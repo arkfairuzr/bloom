@@ -88,3 +88,9 @@ tauri-plugin-drag = "2.1.1"
 tauri-plugin-dialog = "2"
 rustfft = "6"
 
+
+# The app's own crates are large. Level 2 instead of the release default of 3 keeps their
+# compilation within the memory of an ordinary laptop (level 3 ran the compiler out of
+# memory), and the difference does not show in a desktop shell. Dependencies are unaffected.
+[profile.release.package.bloom]
+opt-level = 2
