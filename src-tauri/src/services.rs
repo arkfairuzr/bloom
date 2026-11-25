@@ -1502,12 +1502,27 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         && (rect.right - rect.left) > 0
                         && (rect.bottom - rect.top) > 0;
 
+                    // The shell's own windows (Start, search, the desktop) are handled
+                    // later and must not be skipped as popups.
+                    let is_shell_class = matches!(
+                        class_str,
+                        "Windows.UI.Core.CoreWindow"
+                            | "SimpleWindow"
+                            | "Shell_TrayWnd"
+                            | "Shell_SecondaryTrayWnd"
+                            | "Progman"
+                            | "WorkerW"
+                    );
+                    let is_toast_like =
+                        has_valid_rect && !is_shell_class && is_small_popup(hwnd, &rect);
+
                     if is_bloom
                         || is_popup_menu
                         || !is_visible
                         || is_iconic
                         || is_cloaked
                         || !has_valid_rect
+                        || is_toast_like
                     {
                         hwnd = windows::Win32::UI::WindowsAndMessaging::GetWindow(
                             hwnd,
@@ -2108,6 +2123,7 @@ static MOUSE_HOOK_CURSOR: AtomicI64 = AtomicI64::new(0);
 static MOUSE_HOOK_LAST_EVENT_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LAST_MAIN_IGNORE: AtomicI32 = AtomicI32::new(-1);
 static MH_LAST_DOCK_IGNORE: AtomicI32 = AtomicI32::new(-1);
+static MH_LAST_DOCK_RAISE_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LAST_OV_IGNORE: AtomicI32 = AtomicI32::new(-1);
 static MH_LAST_EDGE_HOVER: AtomicI32 = AtomicI32::new(-1);
 static MH_LAST_TOP_EDGE_HOVER: AtomicI32 = AtomicI32::new(-1);
@@ -2428,6 +2444,41 @@ fn queue_cursor(point: windows::Win32::Foundation::POINT) {
     if let Some(updates) = MOUSE_HOOK_UPDATES.get() {
         let _ = updates.try_send(());
     }
+}
+
+/// A small transient window such as a notification toast, a flyout or a dialog: owned,
+/// or a borderless popup, or a tool window, covering well under a third of its screen.
+/// Such a window near the dock says nothing about whether an app is covering the dock,
+/// so overlap detection looks past it to the window beneath.
+unsafe fn is_small_popup(hwnd: HWND, rect: &windows::Win32::Foundation::RECT) -> bool {
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoA, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindow, GetWindowLongW, GWL_EXSTYLE, GWL_STYLE, GW_OWNER, WS_CAPTION, WS_EX_NOACTIVATE,
+        WS_EX_TOOLWINDOW, WS_POPUP,
+    };
+    let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+    let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+    let popup_like = (ex_style & WS_EX_TOOLWINDOW.0) != 0
+        || (ex_style & WS_EX_NOACTIVATE.0) != 0
+        || ((style & WS_POPUP.0) != 0 && (style & WS_CAPTION.0) == 0)
+        || GetWindow(hwnd, GW_OWNER).is_ok_and(|owner| !owner.is_invalid());
+    if !popup_like {
+        return false;
+    }
+    let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    let mut info = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if !GetMonitorInfoA(monitor, &mut info).as_bool() {
+        return false;
+    }
+    let screen = &info.rcMonitor;
+    let screen_area = (screen.right - screen.left) as i64 * (screen.bottom - screen.top) as i64;
+    let area = (rect.right - rect.left) as i64 * (rect.bottom - rect.top) as i64;
+    area > 0 && area * 100 < screen_area * 30
 }
 
 fn hook_tick_ms() -> i64 {
@@ -2968,6 +3019,14 @@ fn update_dock_interaction(
     }
 
     let final_dock_hover = is_hovered || now < MH_DOCK_EXPIRY_MS.load(Ordering::Relaxed);
+    // A window that appears over the dock while it is revealed (a notification toast,
+    // a flyout) would sit in front of it; put the dock back on top now and then.
+    if final_dock_hover && now - MH_LAST_DOCK_RAISE_MS.load(Ordering::Relaxed) > 800 {
+        MH_LAST_DOCK_RAISE_MS.store(now, Ordering::Relaxed);
+        if let Ok(hwnd) = dock_win.hwnd() {
+            re_assert_topmost(hwnd);
+        }
+    }
     let prev = MH_LAST_EDGE_HOVER.load(Ordering::Relaxed);
     let new_val = if final_dock_hover { 1 } else { 0 };
     if prev != new_val {
